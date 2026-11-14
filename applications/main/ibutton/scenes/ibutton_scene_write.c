@@ -1,10 +1,5 @@
 #include "../ibutton_i.h"
 
-typedef enum {
-    iButtonSceneWriteStateDefault,
-    iButtonSceneWriteStateBlinkYellow,
-} iButtonSceneWriteState;
-
 static inline iButtonCustomEvent
     ibutton_scene_write_to_custom_event(iButtonWorkerWriteResult result) {
     switch(result) {
@@ -25,6 +20,15 @@ static void ibutton_scene_write_callback(void* context, iButtonWorkerWriteResult
     iButton* ibutton = context;
     view_dispatcher_send_custom_event(
         ibutton->view_dispatcher, ibutton_scene_write_to_custom_event(result));
+}
+
+// Replaces the writing screen after the blank refuses the key.
+static void ibutton_scene_write_show_error(iButton* ibutton, const char* text) {
+    Widget* widget = ibutton->widget;
+
+    widget_reset(widget);
+    widget_add_string_element(widget, 64, 4, AlignCenter, AlignTop, FontPrimary, "Cannot Write");
+    widget_add_text_box_element(widget, 0, 20, 128, 44, AlignCenter, AlignTop, text, false);
 }
 
 void ibutton_scene_write_on_enter(void* context) {
@@ -82,7 +86,15 @@ bool ibutton_scene_write_on_event(void* context, SceneManagerEvent event) {
         } else if(event.event == iButtonCustomEventWorkerWriteNoDetect) {
             ibutton_notification_message(ibutton, iButtonNotificationMessageEmulateBlink);
         } else if(event.event == iButtonCustomEventWorkerWriteCannotWrite) {
-            ibutton_notification_message(ibutton, iButtonNotificationMessageYellowBlink);
+            FuriString* reason = furi_string_alloc();
+            ibutton_protocols_render_error(ibutton->protocols, ibutton->key, reason);
+            if(furi_string_empty(reason)) furi_string_set(reason, "This key cannot be written");
+            ibutton_scene_write_show_error(ibutton, furi_string_get_cstr(reason));
+            furi_string_free(reason);
+
+            ibutton_notification_message(ibutton, iButtonNotificationMessageBlinkStop);
+            ibutton_notification_message(ibutton, iButtonNotificationMessageError);
+            ibutton_notification_message(ibutton, iButtonNotificationMessageRedOn);
         }
     }
 
@@ -96,5 +108,6 @@ void ibutton_scene_write_on_exit(void* context) {
     ibutton_worker_stop(ibutton->worker);
     widget_reset(ibutton->widget);
 
+    ibutton_notification_message(ibutton, iButtonNotificationMessageRedOff);
     ibutton_notification_message(ibutton, iButtonNotificationMessageBlinkStop);
 }

@@ -151,9 +151,10 @@ static void
         furi_string_right(app_name, furi_string_search_char(app_name, '/', 1) + 1);
         size_t slash = furi_string_search_char(app_name, '/', 1);
         if(slash != FURI_STRING_FAILURE) {
+            // split before the cut, furi_string_left drops the args
+            FuriString* app_args = furi_string_alloc_set(app_name);
+            furi_string_right(app_args, slash + 1);
             furi_string_left(app_name, slash);
-            FuriString* app_args =
-                furi_string_alloc_set_str(furi_string_get_cstr(app_name) + slash + 1);
             loader_start_with_gui_error(
                 loader, furi_string_get_cstr(app_name), furi_string_get_cstr(app_args));
             furi_string_free(app_args);
@@ -275,6 +276,10 @@ bool archive_scene_browser_on_event(void* context, SceneManagerEvent event) {
             consumed = true;
             break;
         case ArchiveBrowserEventFileMenuRun:
+            if(!selected) {
+                consumed = true;
+                break;
+            }
             if(archive_is_known_app(selected->type)) {
                 archive_run_in_app(browser, selected, favorites);
             }
@@ -282,6 +287,10 @@ bool archive_scene_browser_on_event(void* context, SceneManagerEvent event) {
             consumed = true;
             break;
         case ArchiveBrowserEventFileMenuFavorite: {
+            if(!selected) {
+                consumed = true;
+                break;
+            }
             const char* name = archive_get_name(browser);
             if(favorites) {
                 archive_favorites_delete("%s", name);
@@ -304,6 +313,10 @@ bool archive_scene_browser_on_event(void* context, SceneManagerEvent event) {
             consumed = true;
             break;
         case ArchiveBrowserEventFileMenuShow:
+            if(!selected) {
+                consumed = true;
+                break;
+            }
             if(selected->type == ArchiveFileTypeDiskImage &&
                archive_get_tab(browser) != ArchiveTabDiskImage) {
                 archive_mount_disk_image(browser, selected);
@@ -427,6 +440,10 @@ bool archive_scene_browser_on_event(void* context, SceneManagerEvent event) {
             consumed = true;
             break;
         case ArchiveBrowserEventEnterDir:
+            if(!selected) {
+                consumed = true;
+                break;
+            }
             if(favorites) {
                 archive_switch_tab(browser, TAB_LEFT);
             }
@@ -455,6 +472,10 @@ bool archive_scene_browser_on_event(void* context, SceneManagerEvent event) {
             consumed = true;
             break;
         case ArchiveBrowserEventEnterFavMove:
+            if(!selected) {
+                consumed = true;
+                break;
+            }
             archive_show_file_menu(browser, false, false);
             furi_string_set(archive->fav_move_str, selected->path);
             archive_favorites_move_mode(archive->browser, true);

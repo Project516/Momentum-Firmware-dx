@@ -2,6 +2,7 @@
 
 #include <furi_hal_rfid.h>
 #include <furi_hal_ibutton.h>
+#include <furi_hal_resources.h>
 
 #include <toolbox/protocols/protocol_dict.h>
 
@@ -14,18 +15,21 @@
 typedef struct {
     ProtocolDict* dict;
     ProtocolId emulate_id;
+    OneWireHost* host;
 } iButtonProtocolGroupMisc;
 
 static iButtonProtocolGroupMisc* ibutton_protocol_group_misc_alloc(void) {
     iButtonProtocolGroupMisc* group = malloc(sizeof(iButtonProtocolGroupMisc));
 
-    group->dict = protocol_dict_alloc(ibutton_protocols_misc, iButtonProtocolMiscMax);
+    group->dict = protocol_dict_alloc(ibutton_protocols_misc_dict, iButtonProtocolMiscMax);
     group->emulate_id = PROTOCOL_NO;
+    group->host = onewire_host_alloc(&gpio_ibutton);
 
     return group;
 }
 
 static void ibutton_protocol_group_misc_free(iButtonProtocolGroupMisc* group) {
+    onewire_host_free(group->host);
     protocol_dict_free(group->dict);
     free(group);
 }
@@ -51,8 +55,9 @@ static uint32_t ibutton_protocol_group_misc_get_features(
     iButtonProtocolGroupMisc* group,
     iButtonProtocolLocalId id) {
     UNUSED(group);
-    UNUSED(id);
-    return 0;
+    furi_assert(id < iButtonProtocolMiscMax);
+
+    return ibutton_protocols_misc[id]->write_id ? iButtonProtocolFeatureWriteId : 0;
 }
 
 static const char* ibutton_protocol_group_misc_get_manufacturer(
@@ -140,6 +145,30 @@ static bool ibutton_protocol_group_misc_read(
     furi_stream_buffer_free(read_context.stream);
 
     return result;
+}
+
+static bool ibutton_protocol_group_misc_write_id(
+    iButtonProtocolGroupMisc* group,
+    iButtonProtocolData* data,
+    iButtonProtocolLocalId id) {
+    furi_assert(id < iButtonProtocolMiscMax);
+
+    const iButtonProtocolMiscBase* protocol = ibutton_protocols_misc[id];
+    furi_check(protocol->write_id);
+
+    OneWireHost* host = group->host;
+
+    onewire_host_start(host);
+    furi_delay_ms(100);
+
+    FURI_CRITICAL_ENTER();
+
+    const bool success = protocol->write_id(host, data);
+    onewire_host_stop(host);
+
+    FURI_CRITICAL_EXIT();
+
+    return success;
 }
 
 static void ibutton_protocol_group_misc_emulate_callback(void* context) {
@@ -236,9 +265,10 @@ static void ibutton_protocol_group_misc_render_error(
     iButtonProtocolLocalId id,
     FuriString* result) {
     UNUSED(group);
-    UNUSED(data);
-    UNUSED(id);
-    UNUSED(result);
+    furi_assert(id < iButtonProtocolMiscMax);
+
+    const iButtonProtocolMiscBase* protocol = ibutton_protocols_misc[id];
+    if(protocol->render_error) protocol->render_error(result, data);
 }
 
 static bool ibutton_protocol_group_misc_is_valid(
@@ -246,9 +276,21 @@ static bool ibutton_protocol_group_misc_is_valid(
     const iButtonProtocolData* data,
     iButtonProtocolLocalId id) {
     UNUSED(group);
-    UNUSED(data);
-    UNUSED(id);
-    return true;
+    furi_assert(id < iButtonProtocolMiscMax);
+
+    const iButtonProtocolMiscBase* protocol = ibutton_protocols_misc[id];
+    return protocol->is_valid ? protocol->is_valid(data) : true;
+}
+
+static bool ibutton_protocol_group_misc_is_writable(
+    iButtonProtocolGroupMisc* group,
+    const iButtonProtocolData* data,
+    iButtonProtocolLocalId id) {
+    UNUSED(group);
+    furi_assert(id < iButtonProtocolMiscMax);
+
+    const iButtonProtocolMiscBase* protocol = ibutton_protocols_misc[id];
+    return protocol->is_writable ? protocol->is_writable(data) : true;
 }
 
 static void ibutton_protocol_group_misc_get_editable_data(
@@ -284,7 +326,7 @@ const iButtonProtocolGroupBase ibutton_protocol_group_misc = {
     .get_name = (iButtonProtocolGroupGetStringFunc)ibutton_protocol_group_misc_get_name,
 
     .read = (iButtonProtocolGroupReadFunc)ibutton_protocol_group_misc_read,
-    .write_id = NULL,
+    .write_id = (iButtonProtocolGroupWriteFunc)ibutton_protocol_group_misc_write_id,
     .write_copy = NULL,
 
     .emulate_start = (iButtonProtocolGroupApplyFunc)ibutton_protocol_group_misc_emulate_start,
@@ -300,6 +342,7 @@ const iButtonProtocolGroupBase ibutton_protocol_group_misc = {
     .render_error = (iButtonProtocolGroupRenderFunc)ibutton_protocol_group_misc_render_error,
 
     .is_valid = (iButtonProtocolGroupIsValidFunc)ibutton_protocol_group_misc_is_valid,
+    .is_writable = (iButtonProtocolGroupIsWritableFunc)ibutton_protocol_group_misc_is_writable,
     .get_editable_data =
         (iButtonProtocolGroupGetDataFunc)ibutton_protocol_group_misc_get_editable_data,
     .apply_edits = (iButtonProtocolGroupApplyFunc)ibutton_protocol_group_misc_apply_edits,

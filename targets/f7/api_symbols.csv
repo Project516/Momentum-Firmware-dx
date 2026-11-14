@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,87.1,,
+Version,+,88.5,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/main/archive/helpers/archive_helpers_ext.h,,
 Header,+,applications/services/applications.h,,
@@ -331,7 +331,6 @@ Header,+,targets/furi_hal_include/furi_hal_sd.h,,
 Header,+,targets/furi_hal_include/furi_hal_speaker.h,,
 Header,+,targets/furi_hal_include/furi_hal_spi.h,,
 Header,+,targets/furi_hal_include/furi_hal_usb.h,,
-Header,+,targets/furi_hal_include/furi_hal_usb_ccid.h,,
 Header,+,targets/furi_hal_include/furi_hal_usb_hid.h,,
 Header,+,targets/furi_hal_include/furi_hal_usb_hid_u2f.h,,
 Header,+,targets/furi_hal_include/furi_hal_version.h,,
@@ -739,6 +738,7 @@ Function,+,bit_lib_print_regions,void,"const BitLibRegion*, size_t, const uint8_
 Function,+,bit_lib_push_bit,void,"uint8_t*, size_t, _Bool"
 Function,+,bit_lib_remove_bit_every_nth,size_t,"uint8_t*, size_t, uint8_t, uint8_t"
 Function,+,bit_lib_reverse_16_fast,uint16_t,uint16_t
+Function,+,bit_lib_reverse_32_fast,uint32_t,uint32_t
 Function,+,bit_lib_reverse_8_fast,uint8_t,uint8_t
 Function,+,bit_lib_reverse_bits,void,"uint8_t*, size_t, uint8_t"
 Function,+,bit_lib_set_bit,void,"uint8_t*, size_t, _Bool"
@@ -1810,9 +1810,6 @@ Function,+,furi_hal_subghz_stop_async_tx,void,
 Function,+,furi_hal_subghz_tx,_Bool,
 Function,+,furi_hal_subghz_write_packet,void,"const uint8_t*, uint8_t"
 Function,+,furi_hal_switch,void,void*
-Function,+,furi_hal_usb_ccid_insert_smartcard,void,
-Function,+,furi_hal_usb_ccid_remove_smartcard,void,
-Function,+,furi_hal_usb_ccid_set_callbacks,void,"CcidCallbacks*, void*"
 Function,+,furi_hal_usb_disable,void,
 Function,+,furi_hal_usb_enable,void,
 Function,+,furi_hal_usb_get_config,FuriHalUsbInterface*,
@@ -2107,6 +2104,7 @@ Function,+,ibutton_protocols_get_max_data_size,size_t,iButtonProtocols*
 Function,+,ibutton_protocols_get_name,const char*,"iButtonProtocols*, iButtonProtocolId"
 Function,+,ibutton_protocols_get_protocol_count,uint32_t,
 Function,+,ibutton_protocols_is_valid,_Bool,"iButtonProtocols*, const iButtonKey*"
+Function,+,ibutton_protocols_is_writable,_Bool,"iButtonProtocols*, const iButtonKey*"
 Function,+,ibutton_protocols_load,_Bool,"iButtonProtocols*, iButtonKey*, const char*"
 Function,+,ibutton_protocols_read,_Bool,"iButtonProtocols*, iButtonKey*"
 Function,+,ibutton_protocols_render_brief_data,void,"iButtonProtocols*, const iButtonKey*, FuriString*"
@@ -3962,6 +3960,7 @@ Function,+,view_dispatcher_add_view,void,"ViewDispatcher*, uint32_t, View*"
 Function,+,view_dispatcher_alloc,ViewDispatcher*,
 Function,+,view_dispatcher_alloc_ex,ViewDispatcher*,FuriEventLoop*
 Function,+,view_dispatcher_attach_to_gui,void,"ViewDispatcher*, Gui*, ViewDispatcherType"
+Function,+,view_dispatcher_check_id,_Bool,"ViewDispatcher*, uint32_t"
 Function,+,view_dispatcher_enable_queue,void,ViewDispatcher*
 Function,+,view_dispatcher_free,void,ViewDispatcher*
 Function,+,view_dispatcher_get_event_loop,FuriEventLoop*,ViewDispatcher*
@@ -4669,7 +4668,6 @@ Variable,+,subghz_protocol_raw_decoder,const SubGhzProtocolDecoder,
 Variable,+,subghz_protocol_raw_encoder,const SubGhzProtocolEncoder,
 Variable,+,subghz_protocol_registry,const SubGhzProtocolRegistry,
 Variable,-,suboptarg,char*,
-Variable,+,usb_ccid,FuriHalUsbInterface,
 Variable,+,usb_cdc_dual,FuriHalUsbInterface,
 Variable,+,usb_cdc_single,FuriHalUsbInterface,
 Variable,+,usb_hid,FuriHalUsbInterface,
