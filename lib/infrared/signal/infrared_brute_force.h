@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include "infrared_error_code.h"
+#include "infrared_signal.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,6 +50,10 @@ void infrared_brute_force_set_db_filename(InfraredBruteForce* brute_force, const
  *
  * This function must be called each time after setting the database via
  * a infrared_brute_force_set_db_filename() call.
+ *
+ * Every signal in the database is read and validated, but only the ones whose name
+ * was registered via infrared_brute_force_add_record() are added to the dictionary.
+ * A database name with no matching record is skipped, which is not an error.
  *
  * @param[in,out] brute_force pointer to the instance to be updated.
  * @param[in] auto_detect_buttons bool whether to automatically register newly discovered buttons.
@@ -116,6 +121,31 @@ void infrared_brute_force_stop(InfraredBruteForce* brute_force);
 bool infrared_brute_force_send(InfraredBruteForce* brute_force, uint32_t signal_index);
 
 /**
+ * @brief Load a signal from the chosen category without transmitting it.
+ *
+ * @param[in] brute_force pointer to the instance
+ * @param[in] signal_index the index of the signal within the category, same range as
+ *                         accepted by infrared_brute_force_send()
+ * @param[out] signal pointer to the signal to load into. Must be allocated.
+ * @returns true on success, false otherwise
+ */
+bool infrared_brute_force_load_signal(
+    InfraredBruteForce* brute_force,
+    uint32_t signal_index,
+    InfraredSignal* signal);
+
+/**
+ * @brief Get the name of the category currently being transmitted.
+ *
+ * The return value remains valid until the next infrared_brute_force_start() or
+ * infrared_brute_force_stop() call.
+ *
+ * @param[in] brute_force pointer to the instance to be queried.
+ * @returns pointer to a zero-terminated string containing the category name.
+ */
+const char* infrared_brute_force_get_current_record_name(const InfraredBruteForce* brute_force);
+
+/**
  * @brief Add a signal category to an InfraredBruteForce instance's dictionary.
  *
  * @param[in,out] brute_force pointer to the instance to be updated.
@@ -129,6 +159,9 @@ void infrared_brute_force_add_record(
 
 /**
  * @brief Reset an InfraredBruteForce instance.
+ *
+ * Discards the dictionary and the database file name alike, so the instance must be
+ * configured via infrared_brute_force_set_db_filename() again before being reused.
  *
  * @param[in,out] brute_force pointer to the instance to be reset.
  */

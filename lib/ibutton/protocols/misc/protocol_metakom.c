@@ -338,9 +338,17 @@ static void protocol_metakom_render_error(FuriString* result, const iButtonProto
     }
 }
 
-static bool protocol_metakom_write_id(OneWireHost* host, const iButtonProtocolData* data) {
+static bool protocol_metakom_write_id(
+    OneWireHost* host,
+    iButtonWriteTarget target,
+    const iButtonProtocolData* data) {
+    if(target != iButtonWriteTargetTM01x) return false;
+
     const ProtocolMetakom* proto = data;
 
+    // Deliberately duplicates the check the misc group makes before starting the bus: this
+    // is the last gate before a write that finalizes the blank, which cannot be undone, so
+    // write_id() does not rely on its caller having asked.
     if(!protocol_metakom_is_valid(data)) {
         FURI_LOG_W("Metakom", "Refusing to write a key with odd parity");
         return false;
@@ -371,6 +379,7 @@ const iButtonProtocolMiscBase ibutton_protocol_misc_metakom = {
             .render_uid = (ProtocolRenderData)protocol_metakom_render_uid,
             .render_brief_data = (ProtocolRenderData)protocol_metakom_render_brief_data,
         },
+    .write_targets = IBUTTON_WRITE_TARGET_BIT(iButtonWriteTargetTM01x),
     .write_id = protocol_metakom_write_id,
     .is_valid = protocol_metakom_is_valid,
     .is_writable = protocol_metakom_is_valid,

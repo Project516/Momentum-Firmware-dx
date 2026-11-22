@@ -5,6 +5,7 @@ const SubGhzProtocol* const subghz_protocol_registry_items[] = {
     &subghz_protocol_keeloq,
     &subghz_protocol_nice_flo,
     &subghz_protocol_came,
+    &subghz_protocol_prastel,
     &subghz_protocol_faac_slh,
     &subghz_protocol_nice_flor_s,
     &subghz_protocol_came_twee,
@@ -85,9 +86,16 @@ const SubGhzProtocol* const subghz_protocol_registry_items[] = {
     &subghz_protocol_beninca_arc,
     &subghz_protocol_jarolift,
     &subghz_protocol_ditec_gol4,
+    &subghz_protocol_doorbell32,
     &subghz_protocol_keyfinder,
+    &subghz_protocol_keyfinder2,
     &subghz_protocol_nord_ice,
     &subghz_protocol_allstar_firefly,
+    &subghz_protocol_telcoma_edge,
+    &subghz_protocol_freezer,
+    &subghz_protocol_faac_tm,
+    &subghz_protocol_proteco,
+    &subghz_protocol_belkorn,
 };
 
 const SubGhzProtocolRegistry subghz_protocol_registry = {

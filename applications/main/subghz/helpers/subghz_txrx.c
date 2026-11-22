@@ -4,10 +4,104 @@
 #include <applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h>
 #include <lib/subghz/devices/cc1101_int/cc1101_int_interconnect.h>
 #include <lib/subghz/blocks/custom_btn.h>
+#include <lib/subghz/protocols/bin_raw.h>
+#include <lib/subghz/protocols/keeloq.h>
+#include <lib/subghz/protocols/hormann.h>
+#include <lib/subghz/protocols/came_twee.h>
+#include <lib/subghz/protocols/nice_flor_s.h>
 
 #include <power/power_service/power.h>
 
 #define TAG "SubGhzTxRx"
+
+//A probe for a module that is not there blocks for ~300ms: the OTG rail has to
+//settle before the driver can even ask, and the ask then runs out its own bus
+//timeout. Bound how often that is worth paying
+#define SUBGHZ_RADIO_DEVICE_PROBE_PERIOD_MS 5000UL
+
+// An encoder reserves its whole upload buffer when it is allocated, and the five below are
+// the only ones that ask for more than the default
+static const struct {
+    const char* name;
+    uint16_t block;
+} subghz_txrx_tx_block_table[] = {
+    {SUBGHZ_PROTOCOL_NICE_FLOR_S_NAME, 15360}, // 3648 timings, an O-Code cert press
+    {SUBGHZ_PROTOCOL_BIN_RAW_NAME, 10752}, // 2560 timings
+    {SUBGHZ_PROTOCOL_KEELOQ_NAME, 8192}, // 1872 timings, a counter mode resync pack
+    {SUBGHZ_PROTOCOL_HORMANN_HSM_NAME, 8192}, // 1850 timings
+    {SUBGHZ_PROTOCOL_CAME_TWEE_NAME, 6656}, // 1536 timings
+};
+
+size_t subghz_txrx_tx_block_need(const char* protocol) {
+    if(protocol != NULL) {
+        for(size_t i = 0; i < COUNT_OF(subghz_txrx_tx_block_table); i++) {
+            if(strcmp(protocol, subghz_txrx_tx_block_table[i].name) == 0) {
+                return subghz_txrx_tx_block_table[i].block;
+            }
+        }
+    }
+    return SUBGHZ_TX_MIN_FREE_BLOCK_DEFAULT;
+}
+
+// An encoder wants its upload buffer in one piece, and a heap the history has cut into
+// small pieces has none to give. So one block is held, sized to the widest protocol the
+// history actually holds - a KeeLoq only session does not pay for Nice FloR-S - and handed
+// back at send time, the only moment it is needed
+static void* subghz_txrx_tx_block = NULL;
+static size_t subghz_txrx_tx_block_held = 0;
+static size_t subghz_txrx_tx_block_wanted = 0;
+
+static void subghz_txrx_tx_block_drop(void) {
+    free(subghz_txrx_tx_block);
+    subghz_txrx_tx_block = NULL;
+    subghz_txrx_tx_block_held = 0;
+}
+
+static bool subghz_txrx_tx_block_take(size_t need) {
+    if((need == 0) || (subghz_txrx_tx_block != NULL)) return true;
+    // A failed malloc ends in furi_check, so the block has to be known to fit first. The
+    // largest free block is reported with the allocator header counted in, and a request
+    // spends that header too, so the slack has to be what the header actually costs and
+    // no more: asking for more than that fails to take back the very block just freed
+    if(memmgr_heap_get_max_free_block() < need + SUBGHZ_TX_BLOCK_OVERHEAD) return false;
+    subghz_txrx_tx_block = malloc(need);
+    subghz_txrx_tx_block_held = need;
+    return true;
+}
+
+size_t subghz_txrx_tx_block_size(void) {
+    return subghz_txrx_tx_block_held;
+}
+
+bool subghz_txrx_tx_block_reserve(size_t need) {
+    if(subghz_txrx_tx_block_held == need) {
+        subghz_txrx_tx_block_wanted = need;
+        return true;
+    }
+    const size_t previous = subghz_txrx_tx_block_held;
+    subghz_txrx_tx_block_drop();
+    if(subghz_txrx_tx_block_take(need)) {
+        subghz_txrx_tx_block_wanted = need;
+        return true;
+    }
+    // Growing failed, so put back what was there rather than leave the history unguarded
+    subghz_txrx_tx_block_take(previous);
+    return false;
+}
+
+static bool subghz_txrx_tx_memory_available(const char* protocol) {
+    return memmgr_heap_get_max_free_block() >=
+           (subghz_txrx_tx_block_need(protocol) + SUBGHZ_TX_BLOCK_OVERHEAD);
+}
+
+static void subghz_txrx_worker_pair_callback(void* context, bool level, uint32_t duration) {
+    subghz_txrx_decode(context, level, duration);
+}
+
+static void subghz_txrx_worker_overrun_callback(void* context) {
+    SubGhzTxRx* instance = context;
+    subghz_receiver_reset(instance->receiver);
+}
 
 static void subghz_txrx_radio_device_power_on(SubGhzTxRx* instance) {
     UNUSED(instance);
@@ -25,8 +119,12 @@ static void subghz_txrx_radio_device_power_off(SubGhzTxRx* instance) {
 
 SubGhzTxRx* subghz_txrx_alloc(void) {
     SubGhzTxRx* instance = malloc(sizeof(SubGhzTxRx));
+    instance->transmitter = NULL;
+    subghz_txrx_tx_block_reserve(SUBGHZ_TX_MIN_FREE_BLOCK_DEFAULT);
     instance->setting = subghz_setting_alloc();
     subghz_setting_load(instance->setting, EXT_PATH("subghz/assets/setting_user"));
+
+    instance->air_time_us = 0;
 
     instance->preset = malloc(sizeof(SubGhzRadioPreset));
     instance->preset->name = furi_string_alloc();
@@ -40,6 +138,7 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
 
     instance->worker = subghz_worker_alloc();
     instance->fff_data = flipper_format_string_alloc();
+    instance->tx_from_internal_fff = false;
 
     instance->environment = subghz_environment_alloc();
     instance->is_database_loaded =
@@ -53,16 +152,16 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
         instance->environment, (void*)&subghz_protocol_registry);
     instance->receiver = subghz_receiver_alloc_init(instance->environment);
 
-    subghz_worker_set_overrun_callback(
-        instance->worker, (SubGhzWorkerOverrunCallback)subghz_receiver_reset);
-    subghz_worker_set_pair_callback(
-        instance->worker, (SubGhzWorkerPairCallback)subghz_receiver_decode);
-    subghz_worker_set_context(instance->worker, instance->receiver);
+    subghz_worker_set_overrun_callback(instance->worker, subghz_txrx_worker_overrun_callback);
+    subghz_worker_set_pair_callback(instance->worker, subghz_txrx_worker_pair_callback);
+    subghz_worker_set_context(instance->worker, instance);
 
 #ifndef SUBGHZ_ADD_MANUALLY
     //set default device External
     subghz_devices_init();
     instance->radio_device_type = SubGhzRadioDeviceTypeInternal;
+    instance->radio_device_external_wanted = false;
+    instance->radio_device_probe_tick = furi_get_tick();
     instance->radio_device_type =
         subghz_txrx_radio_device_set(instance, SubGhzRadioDeviceTypeExternalCC1101);
 #endif
@@ -72,6 +171,9 @@ SubGhzTxRx* subghz_txrx_alloc(void) {
 
 void subghz_txrx_free(SubGhzTxRx* instance) {
     furi_assert(instance);
+
+    subghz_txrx_tx_block_wanted = 0;
+    subghz_txrx_tx_block_drop();
 
 #ifndef SUBGHZ_ADD_MANUALLY
     if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
@@ -235,8 +337,83 @@ float subghz_txrx_get_longitude(SubGhzTxRx* instance) {
     return instance->preset->longitude;
 }
 
+//Common tail of both polls: re-run set(), which is the only thing that actually
+//self-tests a module, and report whether that moved us to a different radio
+static bool subghz_txrx_radio_device_probe(SubGhzTxRx* instance) {
+    //Stamped on every probe, cheap path included, so a module that just dropped out
+    //is not hunted for again on the next trip through the menu
+    instance->radio_device_probe_tick = furi_get_tick();
+    const SubGhzRadioDeviceType was = instance->radio_device_type;
+    if(subghz_txrx_radio_device_set(instance, SubGhzRadioDeviceTypeExternalCC1101) == was) {
+        return false;
+    }
+    FURI_LOG_I(TAG, "Radio device is now %s", subghz_txrx_radio_device_get_name(instance));
+    return true;
+}
+
+//Shared entry conditions: swapping devices under a running worker would strand it on
+//the old one, and a user who asked for the internal radio is not to be second-guessed
+static bool subghz_txrx_radio_device_poll_possible(SubGhzTxRx* instance) {
+    if(instance->txrx_state != SubGhzTxRxStateIDLE &&
+       instance->txrx_state != SubGhzTxRxStateSleep) {
+        return false;
+    }
+    return instance->radio_device_external_wanted;
+}
+
+bool subghz_txrx_radio_device_poll(SubGhzTxRx* instance) {
+    furi_assert(instance);
+    if(!subghz_txrx_radio_device_poll_possible(instance)) return false;
+    //Checking the module we are already on costs one 2-byte status read. Searching for
+    //one that is not attached costs a power cycle of the OTG rail and the driver's own
+    //timeout, so it stays out of here and lives in poll_reacquire()
+    if(instance->radio_device_type != SubGhzRadioDeviceTypeExternalCC1101) return false;
+    //a status read separates a live module from one that was pulled
+    if(subghz_devices_is_connect(instance->radio_device)) return false;
+
+    return subghz_txrx_radio_device_probe(instance);
+}
+
+bool subghz_txrx_radio_device_poll_reacquire(SubGhzTxRx* instance) {
+    furi_assert(instance);
+    if(!subghz_txrx_radio_device_poll_possible(instance)) return false;
+    //already on the module: the cheap check is all that is left to do
+    if(instance->radio_device_type == SubGhzRadioDeviceTypeExternalCC1101) {
+        return subghz_txrx_radio_device_poll(instance);
+    }
+    //nothing attached last time we looked, so this is the expensive case: rate-limit it
+    if(furi_get_tick() - instance->radio_device_probe_tick <
+       furi_ms_to_ticks(SUBGHZ_RADIO_DEVICE_PROBE_PERIOD_MS)) {
+        return false;
+    }
+
+    return subghz_txrx_radio_device_probe(instance);
+}
+
+bool subghz_txrx_radio_device_poll_active(SubGhzTxRx* instance) {
+    furi_assert(instance);
+    //nothing sane to do about a module that disappears mid-transmission
+    if(instance->txrx_state == SubGhzTxRxStateTx) return false;
+    if(instance->radio_device_type != SubGhzRadioDeviceTypeExternalCC1101) return false;
+    //cheap gate: without it RX would be torn down and rebuilt on every tick
+    if(subghz_devices_is_connect(instance->radio_device)) return false;
+
+    //A module pulled out mid-RX reads back a steady -74 dBm rather than nothing, so
+    //the screen keeps showing a receiver that looks healthier than an idle one
+    const bool was_rx = (instance->txrx_state == SubGhzTxRxStateRx);
+    subghz_txrx_stop(instance);
+    const bool changed = subghz_txrx_radio_device_poll(instance);
+    if(was_rx) {
+        subghz_txrx_rx_start(instance);
+    }
+    return changed;
+}
+
 static void subghz_txrx_begin(SubGhzTxRx* instance, uint8_t* preset_data) {
     furi_assert(instance);
+    //radio is stopped on every RX and TX start, so this is where a module that was
+    //pulled since the last one gets noticed
+    subghz_txrx_radio_device_poll(instance);
     subghz_devices_reset(instance->radio_device);
     subghz_devices_idle(instance->radio_device);
     subghz_devices_load_preset(instance->radio_device, FuriHalSubGhzPresetCustom, preset_data);
@@ -311,6 +488,11 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
 
     subghz_txrx_stop(instance);
 
+    //Only a transmission of our own fff_data corresponds to subghz->file_path
+    //and may be saved back after TX. History/RX signals (passed as a separate
+    //flipper_format) must never trigger the save-back
+    instance->tx_from_internal_fff = (flipper_format == instance->fff_data);
+
     SubGhzTxRxStartTxState ret = SubGhzTxRxStartTxStateErrorParserOthers;
     FuriString* temp_str = furi_string_alloc();
     do {
@@ -322,6 +504,20 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
             FURI_LOG_E(TAG, "Missing Protocol");
             break;
         }
+        // Hand the held block back so the encoder can take it. What is held is sized with
+        // room to spare for the protocols it covers, so when it is wide enough for this one
+        // the encoder is certain to fit in it and there is nothing to measure. Only a wider
+        // protocol has to look at the heap, and it looks before letting go of anything: a
+        // block released on a measurement that then fails is a block that cannot be retaken
+        if(subghz_txrx_tx_block_need(furi_string_get_cstr(temp_str)) >
+           subghz_txrx_tx_block_size()) {
+            if(!subghz_txrx_tx_memory_available(furi_string_get_cstr(temp_str))) {
+                FURI_LOG_E(TAG, "Not enough free heap for an encoder");
+                ret = SubGhzTxRxStartTxStateErrorNoMemory;
+                break;
+            }
+        }
+        subghz_txrx_tx_block_drop();
         ret = SubGhzTxRxStartTxStateOk;
 
         SubGhzRadioPreset* preset = instance->preset;
@@ -331,11 +527,13 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
         if(instance->transmitter) {
             if(subghz_transmitter_deserialize(instance->transmitter, flipper_format) ==
                SubGhzProtocolStatusOk) {
+                uint8_t* preset_data = NULL;
                 if(strcmp(furi_string_get_cstr(preset->name), "") != 0) {
-                    subghz_txrx_begin(
-                        instance,
-                        subghz_setting_get_preset_data_by_name(
-                            instance->setting, furi_string_get_cstr(preset->name)));
+                    preset_data = subghz_setting_get_preset_data_by_name(
+                        instance->setting, furi_string_get_cstr(preset->name));
+                }
+                if(preset_data != NULL) {
+                    subghz_txrx_begin(instance, preset_data);
                     if(preset->frequency) {
                         if(!subghz_txrx_tx(instance, preset->frequency)) {
                             FURI_LOG_E(TAG, "Only Rx");
@@ -360,13 +558,18 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
                 ret = SubGhzTxRxStartTxStateErrorParserOthers;
             }
         } else {
+            FURI_LOG_E(TAG, "Protocol \"%s\" has no encoder", furi_string_get_cstr(temp_str));
             ret = SubGhzTxRxStartTxStateErrorParserOthers;
         }
         if(ret != SubGhzTxRxStartTxStateOk) {
-            if(instance->transmitter) subghz_transmitter_free(instance->transmitter);
+            if(instance->transmitter) {
+                subghz_transmitter_free(instance->transmitter);
+                instance->transmitter = NULL;
+            }
             if(instance->txrx_state != SubGhzTxRxStateIDLE) {
                 subghz_txrx_idle(instance);
             }
+            subghz_txrx_tx_block_take(subghz_txrx_tx_block_wanted);
         }
 
     } while(false);
@@ -377,10 +580,17 @@ SubGhzTxRxStartTxState subghz_txrx_tx_start(SubGhzTxRx* instance, FlipperFormat*
 void subghz_txrx_rx_start(SubGhzTxRx* instance) {
     furi_assert(instance);
     subghz_txrx_stop(instance);
-    subghz_txrx_begin(
-        instance,
-        subghz_setting_get_preset_data_by_name(
-            subghz_txrx_get_setting(instance), furi_string_get_cstr(instance->preset->name)));
+    // A send that ended on a tight heap can leave the block untaken. Everything it used is
+    // back by now, so this is the moment to try again rather than go without it all session
+    subghz_txrx_tx_block_take(subghz_txrx_tx_block_wanted);
+    uint8_t* preset_data = subghz_setting_get_preset_data_by_name(
+        subghz_txrx_get_setting(instance), furi_string_get_cstr(instance->preset->name));
+    if(preset_data == NULL) {
+        FURI_LOG_E(
+            TAG, "Unknown name preset \" %s \"", furi_string_get_cstr(instance->preset->name));
+        return;
+    }
+    subghz_txrx_begin(instance, preset_data);
     subghz_txrx_rx(instance, instance->preset->frequency);
 }
 
@@ -400,9 +610,14 @@ static void subghz_txrx_tx_stop(SubGhzTxRx* instance) {
     subghz_devices_stop_async_tx(instance->radio_device);
     subghz_transmitter_stop(instance->transmitter);
     subghz_transmitter_free(instance->transmitter);
+    instance->transmitter = NULL;
+    subghz_txrx_tx_block_take(subghz_txrx_tx_block_wanted);
 
     //if protocol dynamic then we save the last upload
-    if(instance->decoder_result->protocol->type == SubGhzProtocolTypeDynamic) {
+    //but only when we transmitted our own fff_data (bound to file_path)
+    //never for history/RX signals, which would overwrite an unrelated file
+    if(instance->tx_from_internal_fff &&
+       instance->decoder_result->protocol->type == SubGhzProtocolTypeDynamic) {
         if(instance->need_save_callback) {
             instance->need_save_callback(instance->need_save_context);
         }
@@ -482,6 +697,9 @@ void subghz_txrx_hopper_update(SubGhzTxRx* instance, float stay_threshold) {
         subghz_txrx_rx_end(instance);
     }
     if(instance->txrx_state == SubGhzTxRxStateIDLE) {
+        //No radio check here: a hop is the hot path, and both callers of this run
+        //subghz_txrx_radio_device_poll_active() earlier in the same tick, so a module
+        //that went away is already caught without paying for it once per hop
         subghz_receiver_reset(instance->receiver);
         instance->preset->frequency =
             subghz_setting_get_hopper_frequency(instance->setting, instance->hopper_idx_frequency);
@@ -673,20 +891,36 @@ SubGhzRadioDeviceType
     subghz_txrx_radio_device_set(SubGhzTxRx* instance, SubGhzRadioDeviceType radio_device_type) {
     furi_assert(instance);
 
-    if(radio_device_type == SubGhzRadioDeviceTypeExternalCC1101 &&
-       subghz_txrx_radio_device_is_external_connected(instance, SUBGHZ_DEVICE_CC1101_EXT_NAME)) {
-        subghz_txrx_radio_device_power_on(instance);
-        instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME);
-        subghz_devices_begin(instance->radio_device);
-        instance->radio_device_type = SubGhzRadioDeviceTypeExternalCC1101;
-    } else {
-        subghz_txrx_radio_device_power_off(instance);
-        if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
-            subghz_devices_end(instance->radio_device);
-        }
-        instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
-        instance->radio_device_type = SubGhzRadioDeviceTypeInternal;
+    //what was asked for, which outlives a module that stops answering
+    instance->radio_device_external_wanted =
+        (radio_device_type == SubGhzRadioDeviceTypeExternalCC1101);
+
+    //Tear the external module down first: begin() is what actually self-tests it,
+    //so re-running that is how a module that came or went gets noticed
+    if(instance->radio_device_type != SubGhzRadioDeviceTypeInternal) {
+        subghz_devices_end(instance->radio_device);
     }
+
+    if(radio_device_type == SubGhzRadioDeviceTypeExternalCC1101) {
+        subghz_txrx_radio_device_power_on(instance);
+        const SubGhzDevice* device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_EXT_NAME);
+        if(device == NULL) {
+            //a missing driver and missing hardware are very different problems
+            FURI_LOG_E(TAG, "No %s driver loaded", SUBGHZ_DEVICE_CC1101_EXT_NAME);
+        } else if(subghz_devices_begin(device)) {
+            instance->radio_device = device;
+            instance->radio_device_type = SubGhzRadioDeviceTypeExternalCC1101;
+            return instance->radio_device_type;
+        } else {
+            //begin() allocates before it self-tests, so a failure still has to be freed
+            subghz_devices_end(device);
+            FURI_LOG_W(TAG, "External radio did not answer, using internal");
+        }
+    }
+
+    subghz_txrx_radio_device_power_off(instance);
+    instance->radio_device = subghz_devices_get_by_name(SUBGHZ_DEVICE_CC1101_INT_NAME);
+    instance->radio_device_type = SubGhzRadioDeviceTypeInternal;
 
     return instance->radio_device_type;
 }
@@ -738,6 +972,23 @@ void subghz_txrx_reset_dynamic_and_custom_btns(SubGhzTxRx* instance) {
 SubGhzReceiver* subghz_txrx_get_receiver(SubGhzTxRx* instance) {
     furi_assert(instance);
     return instance->receiver;
+}
+
+//Every sample reaches the decoders through here so that the app can keep its
+//own clock of how much air has been decoded. The sample is fed first and
+//counted afterwards: a decoder reports a frame from inside
+//subghz_receiver_decode(), and the duration being fed at that moment is the gap
+//that terminated the frame, so during the callback the clock reads the end of
+//the frame's data rather than the end of the silence that followed it
+void subghz_txrx_decode(SubGhzTxRx* instance, bool level, uint32_t duration) {
+    furi_assert(instance);
+    subghz_receiver_decode(instance->receiver, level, duration);
+    instance->air_time_us += duration;
+}
+
+uint32_t subghz_txrx_get_air_time_ms(SubGhzTxRx* instance) {
+    furi_assert(instance);
+    return (uint32_t)(instance->air_time_us / 1000);
 }
 
 void subghz_txrx_set_default_preset(SubGhzTxRx* instance, uint32_t frequency) {

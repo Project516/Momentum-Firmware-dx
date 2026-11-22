@@ -4,6 +4,7 @@
 #include "../blocks/encoder.h"
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
+#include "common.h"
 
 #define TAG "SubGhzProtocolAnsonic"
 
@@ -21,12 +22,21 @@ static const SubGhzBlockConst subghz_protocol_ansonic_const = {
     .min_count_bit_for_found = 12,
 };
 
+/* Tolerance on a whole bit period (te_short + te_long = 1666us). The per-pulse
+ * windows above also fit an out-of-spec Nice FLO remote running ~610/1220us, so
+ * gate the bit period too - it is the steadiest value in a frame (sd 14us, against
+ * 20-23us for each half) and that remote's 1830us is 164us clear of 1666us.
+ * +-110us rejects it and still allows a genuine remote ~6% of clock error.
+ */
+#define ANSONIC_TE_SUM_DELTA (110)
+
 struct SubGhzProtocolDecoderAnsonic {
     SubGhzProtocolDecoderBase base;
 
     SubGhzBlockDecoder decoder;
     SubGhzBlockGeneric generic;
 };
+SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderAnsonic);
 
 struct SubGhzProtocolEncoderAnsonic {
     SubGhzProtocolEncoderBase base;
@@ -34,6 +44,7 @@ struct SubGhzProtocolEncoderAnsonic {
     SubGhzProtocolBlockEncoder encoder;
     SubGhzBlockGeneric generic;
 };
+SUBGHZ_ASSERT_ENCODER_GENERIC_LAYOUT(SubGhzProtocolEncoderAnsonic);
 
 typedef enum {
     AnsonicDecoderStepReset = 0,
@@ -44,26 +55,25 @@ typedef enum {
 
 const SubGhzProtocolDecoder subghz_protocol_ansonic_decoder = {
     .alloc = subghz_protocol_decoder_ansonic_alloc,
-    .free = subghz_protocol_decoder_ansonic_free,
+    .free = subghz_protocol_decoder_common_free,
 
     .feed = subghz_protocol_decoder_ansonic_feed,
-    .reset = subghz_protocol_decoder_ansonic_reset,
+    .reset = subghz_protocol_decoder_common_reset,
 
-    .get_hash_data = NULL,
-    .get_hash_data_long = subghz_protocol_decoder_ansonic_get_hash_data,
-    .serialize = subghz_protocol_decoder_ansonic_serialize,
+    .get_hash_data = subghz_protocol_decoder_common_get_hash_data,
+    .get_hash_data_long = subghz_protocol_decoder_common_get_hash_data_long,
+    .serialize = subghz_protocol_decoder_common_serialize,
     .deserialize = subghz_protocol_decoder_ansonic_deserialize,
     .get_string = subghz_protocol_decoder_ansonic_get_string,
-    .get_string_brief = NULL,
 };
 
 const SubGhzProtocolEncoder subghz_protocol_ansonic_encoder = {
     .alloc = subghz_protocol_encoder_ansonic_alloc,
-    .free = subghz_protocol_encoder_ansonic_free,
+    .free = subghz_protocol_encoder_common_free,
 
     .deserialize = subghz_protocol_encoder_ansonic_deserialize,
-    .stop = subghz_protocol_encoder_ansonic_stop,
-    .yield = subghz_protocol_encoder_ansonic_yield,
+    .stop = subghz_protocol_encoder_common_stop,
+    .yield = subghz_protocol_encoder_common_yield,
 };
 
 const SubGhzProtocol subghz_protocol_ansonic = {
@@ -79,29 +89,14 @@ const SubGhzProtocol subghz_protocol_ansonic = {
 
 void* subghz_protocol_encoder_ansonic_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    SubGhzProtocolEncoderAnsonic* instance = malloc(sizeof(SubGhzProtocolEncoderAnsonic));
-
-    instance->base.protocol = &subghz_protocol_ansonic;
-    instance->generic.protocol_name = instance->base.protocol->name;
-
-    instance->encoder.repeat = 3;
-    instance->encoder.size_upload = 52;
-    instance->encoder.upload = malloc(instance->encoder.size_upload * sizeof(LevelDuration));
-    instance->encoder.is_running = false;
-    return instance;
-}
-
-void subghz_protocol_encoder_ansonic_free(void* context) {
-    furi_assert(context);
-    SubGhzProtocolEncoderAnsonic* instance = context;
-    free(instance->encoder.upload);
-    free(instance);
+    return subghz_protocol_encoder_common_alloc(
+        sizeof(SubGhzProtocolEncoderAnsonic), &subghz_protocol_ansonic, 3, 52);
 }
 
 /**
  * Generating an upload from data.
  * @param instance Pointer to a SubGhzProtocolEncoderAnsonic instance
- * @return true On success
+ * @return true Always; this encoder has no failure path
  */
 static bool subghz_protocol_encoder_ansonic_get_upload(SubGhzProtocolEncoderAnsonic* instance) {
     furi_assert(instance);
@@ -166,47 +161,10 @@ SubGhzProtocolStatus
     return res;
 }
 
-void subghz_protocol_encoder_ansonic_stop(void* context) {
-    SubGhzProtocolEncoderAnsonic* instance = context;
-    instance->encoder.is_running = false;
-}
-
-LevelDuration subghz_protocol_encoder_ansonic_yield(void* context) {
-    SubGhzProtocolEncoderAnsonic* instance = context;
-
-    if(instance->encoder.repeat == 0 || !instance->encoder.is_running) {
-        instance->encoder.is_running = false;
-        return level_duration_reset();
-    }
-
-    LevelDuration ret = instance->encoder.upload[instance->encoder.front];
-
-    if(++instance->encoder.front == instance->encoder.size_upload) {
-        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
-        instance->encoder.front = 0;
-    }
-
-    return ret;
-}
-
 void* subghz_protocol_decoder_ansonic_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    SubGhzProtocolDecoderAnsonic* instance = malloc(sizeof(SubGhzProtocolDecoderAnsonic));
-    instance->base.protocol = &subghz_protocol_ansonic;
-    instance->generic.protocol_name = instance->base.protocol->name;
-    return instance;
-}
-
-void subghz_protocol_decoder_ansonic_free(void* context) {
-    furi_assert(context);
-    SubGhzProtocolDecoderAnsonic* instance = context;
-    free(instance);
-}
-
-void subghz_protocol_decoder_ansonic_reset(void* context) {
-    furi_assert(context);
-    SubGhzProtocolDecoderAnsonic* instance = context;
-    instance->decoder.parser_step = AnsonicDecoderStepReset;
+    return subghz_protocol_decoder_common_alloc(
+        sizeof(SubGhzProtocolDecoderAnsonic), &subghz_protocol_ansonic);
 }
 
 void subghz_protocol_decoder_ansonic_feed(void* context, bool level, uint32_t duration) {
@@ -259,6 +217,14 @@ void subghz_protocol_decoder_ansonic_feed(void* context, bool level, uint32_t du
         break;
     case AnsonicDecoderStepCheckDuration:
         if(level) {
+            // Reject anything whose bit rate is not Ansonic's, see ANSONIC_TE_SUM_DELTA
+            if(DURATION_DIFF(
+                   instance->decoder.te_last + duration,
+                   subghz_protocol_ansonic_const.te_short +
+                       subghz_protocol_ansonic_const.te_long) >= ANSONIC_TE_SUM_DELTA) {
+                instance->decoder.parser_step = AnsonicDecoderStepReset;
+                break;
+            }
             if((DURATION_DIFF(instance->decoder.te_last, subghz_protocol_ansonic_const.te_short) <
                 subghz_protocol_ansonic_const.te_delta) &&
                (DURATION_DIFF(duration, subghz_protocol_ansonic_const.te_long) <
@@ -295,22 +261,6 @@ static void subghz_protocol_ansonic_check_remote_controller(SubGhzBlockGeneric* 
  */
     instance->cnt = instance->data & 0xFFF;
     instance->btn = ((instance->data >> 1) & 0x3);
-}
-
-uint32_t subghz_protocol_decoder_ansonic_get_hash_data(void* context) {
-    furi_assert(context);
-    SubGhzProtocolDecoderAnsonic* instance = context;
-    return subghz_protocol_blocks_get_hash_data_long(
-        &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
-}
-
-SubGhzProtocolStatus subghz_protocol_decoder_ansonic_serialize(
-    void* context,
-    FlipperFormat* flipper_format,
-    SubGhzRadioPreset* preset) {
-    furi_assert(context);
-    SubGhzProtocolDecoderAnsonic* instance = context;
-    return subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
 }
 
 SubGhzProtocolStatus

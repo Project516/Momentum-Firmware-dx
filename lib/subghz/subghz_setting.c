@@ -32,10 +32,12 @@ static const uint32_t subghz_frequency_list[] = {
     314350000,
     314980000,
     315000000,
+    317000000,
     318000000,
     320000000,
     320150000,
     330000000,
+    336100000,
     345000000,
     348000000,
     350000000,
@@ -69,6 +71,7 @@ static const uint32_t subghz_frequency_list[] = {
 
     /* 779 - 928 */
     779000000,
+    868000000,
     868350000,
     868400000,
     868460000,
@@ -357,7 +360,7 @@ int subghz_setting_get_inx_preset_by_name(SubGhzSetting* instance, const char* p
             }
             idx++;
         }
-    furi_crash("SubGhz: No name preset.");
+    FURI_LOG_E(TAG, "No preset with name \"%s\"", preset_name);
     return -1;
 }
 
@@ -428,8 +431,12 @@ size_t subghz_setting_get_preset_data_size(SubGhzSetting* instance, size_t idx) 
 
 uint8_t* subghz_setting_get_preset_data_by_name(SubGhzSetting* instance, const char* preset_name) {
     furi_check(instance);
-    SubGhzSettingCustomPresetItem* item = SubGhzSettingCustomPresetItemArray_get(
-        instance->preset->data, subghz_setting_get_inx_preset_by_name(instance, preset_name));
+    int idx = subghz_setting_get_inx_preset_by_name(instance, preset_name);
+    if(idx < 0) {
+        return NULL;
+    }
+    SubGhzSettingCustomPresetItem* item =
+        SubGhzSettingCustomPresetItemArray_get(instance->preset->data, idx);
     return item->custom_preset_data;
 }
 

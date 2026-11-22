@@ -339,7 +339,12 @@ static void protocol_cyfral_render_brief_data(ProtocolCyfral* proto, FuriString*
     protocol_cyfral_render_uid(proto, result);
 }
 
-static bool protocol_cyfral_write_id(OneWireHost* host, const iButtonProtocolData* data) {
+static bool protocol_cyfral_write_id(
+    OneWireHost* host,
+    iButtonWriteTarget target,
+    const iButtonProtocolData* data) {
+    if(target != iButtonWriteTargetTM01x) return false;
+
     const ProtocolCyfral* proto = data;
 
     // The encoder yields the code in the order the emulated device sends it, least
@@ -370,6 +375,7 @@ const iButtonProtocolMiscBase ibutton_protocol_misc_cyfral = {
             .render_uid = (ProtocolRenderData)protocol_cyfral_render_uid,
             .render_brief_data = (ProtocolRenderData)protocol_cyfral_render_brief_data,
         },
+    .write_targets = IBUTTON_WRITE_TARGET_BIT(iButtonWriteTargetTM01x),
     .write_id = protocol_cyfral_write_id,
     // A Cyfral code carries no check digit, so every value that can be typed is a valid key.
     .is_valid = NULL,

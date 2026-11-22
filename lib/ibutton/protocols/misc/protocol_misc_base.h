@@ -3,21 +3,26 @@
 #include <toolbox/protocols/protocol.h>
 
 #include "../protocol_common_i.h"
+#include "../../ibutton_write_targets.h"
 
 #include <one_wire/one_wire_host.h>
 
 /**
- * Write protocol data into a blank.
+ * Write protocol data into a blank of a specific type.
  *
  * The protocol chooses the blank writer and hands it the code to program; the
  * writer lays the code out in the frame its blank expects.
  *
- * @param host  OneWire host instance.
- * @param data  Protocol data, `base.data_size` bytes.
+ * @param host    OneWire host instance.
+ * @param target  Blank type to address, one of the protocol's write_targets.
+ * @param data    Protocol data, `base.data_size` bytes.
  *
  * @returns true if the blank was written and verified.
  */
-typedef bool (*iButtonProtocolMiscWriteIdFunc)(OneWireHost* host, const iButtonProtocolData* data);
+typedef bool (*iButtonProtocolMiscWriteIdFunc)(
+    OneWireHost* host,
+    iButtonWriteTarget target,
+    const iButtonProtocolData* data);
 
 /**
  * Check the protocol's own redundancy in a key's data.
@@ -52,6 +57,9 @@ typedef void (
 typedef struct {
     /** Generic part, used for decoding, encoding and rendering. */
     const ProtocolBase base;
+
+    /** Blank types a write may try. Non-zero is what advertises WriteId. */
+    const iButtonWriteTargetMask write_targets;
 
     const iButtonProtocolMiscWriteIdFunc write_id;
 

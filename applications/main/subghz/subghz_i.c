@@ -21,8 +21,37 @@ void subghz_blink_stop(SubGhz* subghz) {
     notification_message(subghz->notifications, &sequence_blink_stop);
 }
 
+// Deleting old signals makes room for a send as well as for a reception: the list is what
+// is holding the heap, so the oldest records go until the block this one needs can be held.
+// Only records older than the one being sent are dropped, so it is never the one that goes,
+// and the chosen index moves down with them so it still points at the same signal
+static bool subghz_tx_make_room(SubGhz* subghz, FlipperFormat* flipper_format) {
+    if(!subghz->last_settings->delete_old_signals) return false;
+
+    FuriString* protocol = furi_string_alloc();
+    bool freed = false;
+    if(flipper_format_rewind(flipper_format) &&
+       flipper_format_read_string(flipper_format, "Protocol", protocol)) {
+        const size_t need = subghz_txrx_tx_block_need(furi_string_get_cstr(protocol));
+        // Every delete asks for the block again, so this stops as soon as one is held
+        while((subghz->idx_menu_chosen > 0) && (subghz_txrx_tx_block_size() < need)) {
+            subghz_history_delete_item(subghz->history, 0);
+            subghz_view_receiver_delete_item(subghz->subghz_receiver, 0);
+            subghz->idx_menu_chosen--;
+            freed = true;
+        }
+    }
+    furi_string_free(protocol);
+    return freed;
+}
+
 bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format) {
-    switch(subghz_txrx_tx_start(subghz->txrx, flipper_format)) {
+    SubGhzTxRxStartTxState state = subghz_txrx_tx_start(subghz->txrx, flipper_format);
+    if((state == SubGhzTxRxStartTxStateErrorNoMemory) &&
+       subghz_tx_make_room(subghz, flipper_format)) {
+        state = subghz_txrx_tx_start(subghz->txrx, flipper_format);
+    }
+    switch(state) {
     case SubGhzTxRxStartTxStateErrorParserOthers:
         dialog_message_show_storage_error(
             subghz->dialogs, "Error in protocol\nparameters\ndescription");
@@ -32,12 +61,31 @@ bool subghz_tx_start(SubGhz* subghz, FlipperFormat* flipper_format) {
         SubGhzTx can_tx = subghz_txrx_radio_device_check_tx(subghz->txrx, frequency);
         subghz_dialog_message_freq_error(subghz, can_tx);
         break;
+    case SubGhzTxRxStartTxStateErrorNoMemory:
+        notification_message(subghz->notifications, &sequence_error);
+        subghz_dialog_message_no_memory(subghz);
+        break;
 
     default:
         return true;
         break;
     }
     return false;
+}
+
+void subghz_dialog_message_no_memory(SubGhz* subghz) {
+    DialogMessage* message = dialog_message_alloc();
+    dialog_message_set_header(message, "Not enough memory", 63, 3, AlignCenter, AlignTop);
+    dialog_message_set_text(
+        message,
+        "Signal can only\nbe saved.\nDelete old signals\nto send it.",
+        0,
+        17,
+        AlignLeft,
+        AlignTop);
+    dialog_message_set_icon(message, &I_WarningDolphinFlip_45x42, 83, 22);
+    dialog_message_show(subghz->dialogs, message);
+    dialog_message_free(message);
 }
 
 void subghz_dialog_message_freq_error(SubGhz* subghz, SubGhzTx can_tx) {
@@ -181,8 +229,12 @@ bool subghz_key_load(SubGhz* subghz, const char* file_path, bool show_dialog) {
             temp_lon = NAN;
         }
 
-        size_t preset_index =
+        int preset_index =
             subghz_setting_get_inx_preset_by_name(setting, furi_string_get_cstr(temp_str));
+        if(preset_index < 0) {
+            FURI_LOG_E(TAG, "Unknown Preset");
+            break;
+        }
 
         //Edit TX power, if necessary.
         uint8_t* preset_data = subghz_setting_get_preset_data(setting, preset_index);
@@ -360,12 +412,32 @@ bool subghz_save_protocol_to_file(
 void subghz_save_to_file(void* context) {
     furi_assert(context);
     SubGhz* subghz = context;
-    if(subghz_path_is_file(subghz->file_path)) {
-        subghz_save_protocol_to_file(
-            subghz,
-            subghz_txrx_get_fff_data(subghz->txrx),
-            furi_string_get_cstr(subghz->file_path));
+
+    if(!subghz_path_is_file(subghz->file_path)) {
+        return;
     }
+
+    FlipperFormat* fff_data = subghz_txrx_get_fff_data(subghz->txrx);
+
+    //Guard against corrupting RAW files
+    //This callback runs after transmitting a dynamic protocol to persist the
+    //updated rolling counter back into its source file. But file_path and
+    //fff_data can be stale relative to what was actually transmitted: e.g.
+    //sending a received signal from the Info screen leaves file_path pointing
+    //at a previously opened RAW file while fff_data still holds only the RAW
+    //header (Protocol/File_name/Radio_device_name). Writing that buffer would
+    //delete the RAW_Data and destroy the file. RAW samples are streamed from
+    //disk and are never persisted through this path, so never save RAW here.
+    FuriString* protocol = furi_string_alloc();
+    bool is_raw = flipper_format_rewind(fff_data) &&
+                  flipper_format_read_string(fff_data, "Protocol", protocol) &&
+                  furi_string_equal(protocol, "RAW");
+    furi_string_free(protocol);
+    if(is_raw) {
+        return;
+    }
+
+    subghz_save_protocol_to_file(subghz, fff_data, furi_string_get_cstr(subghz->file_path));
 }
 
 bool subghz_load_protocol_from_file(SubGhz* subghz) {

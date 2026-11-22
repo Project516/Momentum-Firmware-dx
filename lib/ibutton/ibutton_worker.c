@@ -31,9 +31,26 @@ iButtonWorker* ibutton_worker_alloc(iButtonProtocols* protocols) {
     worker->messages = furi_message_queue_alloc(1, sizeof(iButtonMessage));
 
     worker->mode_index = iButtonWorkerModeIdle;
+    // Honouring the user's setting is opt-in, see ibutton_worker_set_write_targets().
+    worker->write_target_mask = ibutton_write_targets_default();
+    worker->write_target = iButtonWriteTargetMax;
     worker->thread = furi_thread_alloc_ex("iButtonWorker", 2048, ibutton_worker_thread, worker);
 
     return worker;
+}
+
+void ibutton_worker_set_write_targets(iButtonWorker* worker, iButtonWriteTargetMask mask) {
+    furi_check(worker);
+
+    worker->write_target_mask = mask & IBUTTON_WRITE_TARGET_MASK_ALL;
+}
+
+const char* ibutton_worker_get_write_chip_name(iButtonWorker* worker) {
+    furi_check(worker);
+
+    if(worker->write_target >= iButtonWriteTargetMax) return "";
+
+    return ibutton_write_target_name(worker->write_target);
 }
 
 void ibutton_worker_read_set_callback(
@@ -82,11 +99,12 @@ void ibutton_worker_write_id_start(iButtonWorker* worker, iButtonKey* key) {
     furi_check(worker);
     furi_check(key);
 
-    // A failed write attempt is reported as "no blank detected", which is
-    // indistinguishable from an empty reader, so a key the protocol cannot write
-    // is rejected before the write mode starts.
+    // Refused before the worker starts, not in the tick: letting the attempt fail would be
+    // reported as "no blank detected", indistinguishable from an empty reader, and write
+    // mode's quant is a second, so a veto raised in the tick would leave "Writing ID" up for
+    // that long first.
     if(!ibutton_protocols_is_writable(worker->protocols, key)) {
-        if(worker->write_cb) worker->write_cb(worker->cb_ctx, iButtonWorkerWriteCannotWrite);
+        ibutton_worker_write_report(worker, iButtonWorkerWriteCannotWrite);
         return;
     }
 

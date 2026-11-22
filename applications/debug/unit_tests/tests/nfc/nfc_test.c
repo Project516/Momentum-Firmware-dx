@@ -20,6 +20,9 @@
 #include <nfc/protocols/slix/slix_i.h>
 #include <nfc/protocols/slix/slix_poller.h>
 #include <nfc/protocols/slix/slix_poller_i.h>
+#include <nfc/protocols/mf_plus/mf_plus_crypto.h>
+#include <nfc/protocols/texkom/texkom.h>
+#include <nfc/protocols/texkom/texkom_i.h>
 
 #include <nfc/nfc_poller.h>
 
@@ -787,6 +790,14 @@ MU_TEST(felica_standard_v3_file_test) {
     nfc_device_free(nfc_device);
 }
 
+MU_TEST(felica_oversized_lite_file_test) {
+    NfcDevice* nfc_device = nfc_device_alloc();
+    mu_assert(
+        !nfc_device_load(nfc_device, EXT_PATH("unit_tests/nfc/Felica_oversized_lite.nfc")),
+        "oversized FeliCa Lite file was accepted");
+    nfc_device_free(nfc_device);
+}
+
 MU_TEST(felica_standard_read) {
     NfcDeviceData* nfc_device = nfc_device_alloc();
     mu_assert(
@@ -1014,6 +1025,578 @@ MU_TEST(slix_set_password_access_all_passwords_cap) {
         EXT_PATH("unit_tests/nfc/Slix_cap_accept_all_pass.nfc"), 0x12341234, false);
 }
 
+// AES-CMAC known-answer vectors from RFC 4493 (Appendix D.1), NIST AES-128 key. Exercises
+// the empty / single-complete-block / partial-final / multi-block paths of the CMAC plus the
+// cmac8 odd-index truncation used by MIFARE Plus SL3.
+MU_TEST(mf_plus_crypto_cmac_rfc4493) {
+    const uint8_t key[16] = {
+        0x2b,
+        0x7e,
+        0x15,
+        0x16,
+        0x28,
+        0xae,
+        0xd2,
+        0xa6,
+        0xab,
+        0xf7,
+        0x15,
+        0x88,
+        0x09,
+        0xcf,
+        0x4f,
+        0x3c};
+    const uint8_t msg[64] = {0x6b, 0xc1, 0xbe, 0xe2, 0x2e, 0x40, 0x9f, 0x96, 0xe9, 0x3d, 0x7e,
+                             0x11, 0x73, 0x93, 0x17, 0x2a, 0xae, 0x2d, 0x8a, 0x57, 0x1e, 0x03,
+                             0xac, 0x9c, 0x9e, 0xb7, 0x6f, 0xac, 0x45, 0xaf, 0x8e, 0x51, 0x30,
+                             0xc8, 0x1c, 0x46, 0xa3, 0x5c, 0xe4, 0x11, 0xe5, 0xfb, 0xc1, 0x19,
+                             0x1a, 0x0a, 0x52, 0xef, 0xf6, 0x9f, 0x24, 0x45, 0xdf, 0x4f, 0x9b,
+                             0x17, 0xad, 0x2b, 0x41, 0x7b, 0xe6, 0x6c, 0x37, 0x10};
+    const uint8_t exp0[16] = {
+        0xbb,
+        0x1d,
+        0x69,
+        0x29,
+        0xe9,
+        0x59,
+        0x37,
+        0x28,
+        0x7f,
+        0xa3,
+        0x7d,
+        0x12,
+        0x9b,
+        0x75,
+        0x67,
+        0x46};
+    const uint8_t exp16[16] = {
+        0x07,
+        0x0a,
+        0x16,
+        0xb4,
+        0x6b,
+        0x4d,
+        0x41,
+        0x44,
+        0xf7,
+        0x9b,
+        0xdd,
+        0x9d,
+        0xd0,
+        0x4a,
+        0x28,
+        0x7c};
+    const uint8_t exp40[16] = {
+        0xdf,
+        0xa6,
+        0x67,
+        0x47,
+        0xde,
+        0x9a,
+        0xe6,
+        0x30,
+        0x30,
+        0xca,
+        0x32,
+        0x61,
+        0x14,
+        0x97,
+        0xc8,
+        0x27};
+    const uint8_t exp64[16] = {
+        0x51,
+        0xf0,
+        0xbe,
+        0xbf,
+        0x7e,
+        0x3b,
+        0x9d,
+        0x92,
+        0xfc,
+        0x49,
+        0x74,
+        0x17,
+        0x79,
+        0x36,
+        0x3c,
+        0xfe};
+    uint8_t mac[16];
+
+    mf_plus_crypto_cmac(key, msg, 0, mac);
+    mu_assert(memcmp(mac, exp0, 16) == 0, "CMAC RFC4493 len=0 mismatch");
+    mf_plus_crypto_cmac(key, msg, 16, mac);
+    mu_assert(memcmp(mac, exp16, 16) == 0, "CMAC RFC4493 len=16 mismatch");
+    mf_plus_crypto_cmac(key, msg, 40, mac);
+    mu_assert(memcmp(mac, exp40, 16) == 0, "CMAC RFC4493 len=40 mismatch");
+    mf_plus_crypto_cmac(key, msg, 64, mac);
+    mu_assert(memcmp(mac, exp64, 16) == 0, "CMAC RFC4493 len=64 mismatch");
+
+    // cmac8 = the 8 odd-indexed bytes of the full CMAC (checked on the len=16 vector).
+    const uint8_t exp8[8] = {0x0a, 0xb4, 0x4d, 0x44, 0x9b, 0x9d, 0x4a, 0x7c};
+    uint8_t mac8[8];
+    mf_plus_crypto_cmac8(key, msg, 16, mac8);
+    mu_assert(memcmp(mac8, exp8, 8) == 0, "cmac8 RFC4493 len=16 mismatch");
+}
+
+// Locks the data-encryption IV byte layout to the reference fork's (U-Prox-validated) layout: both
+// IVs pack the little-endian {R_ctr, W_ctr} word {R_lo, R_hi, W_lo, W_hi}. Read repeats it across
+// IV[0..11] with TI at IV[12..15]; write puts TI at IV[0..3] then repeats it across IV[4..15].
+MU_TEST(mf_plus_crypto_data_iv_layout) {
+    const uint8_t ti[4] = {0xa1, 0xa2, 0xa3, 0xa4};
+    uint8_t iv[16];
+
+    // Read-only session (W_ctr == 0, R_ctr < 256) reduces to the hardware-validated single-low-byte
+    // form: R_lo at [0]/[4]/[8], TI at [12..15].
+    const uint8_t exp_read[16] = {
+        0x05,
+        0x00,
+        0x00,
+        0x00,
+        0x05,
+        0x00,
+        0x00,
+        0x00,
+        0x05,
+        0x00,
+        0x00,
+        0x00,
+        0xa1,
+        0xa2,
+        0xa3,
+        0xa4};
+    mf_plus_crypto_build_read_iv(ti, 0x0005, 0x0000, iv);
+    mu_assert(memcmp(iv, exp_read, 16) == 0, "read IV layout mismatch");
+
+    // Write IV (R_ctr == 0, W_ctr == 0x0007): TI at [0..3], W_lo at [6]/[10]/[14].
+    const uint8_t exp_write[16] = {
+        0xa1,
+        0xa2,
+        0xa3,
+        0xa4,
+        0x00,
+        0x00,
+        0x07,
+        0x00,
+        0x00,
+        0x00,
+        0x07,
+        0x00,
+        0x00,
+        0x00,
+        0x07,
+        0x00};
+    mf_plus_crypto_build_write_iv(ti, 0x0000, 0x0007, iv);
+    mu_assert(memcmp(iv, exp_write, 16) == 0, "write IV layout mismatch");
+
+    // Both counters pack little-endian in full: distinct R_ctr/W_ctr bytes land at fixed positions
+    // in the repeated {R_lo, R_hi, W_lo, W_hi} word.
+    const uint8_t exp_read_full[16] = {
+        0x02,
+        0x01,
+        0x04,
+        0x03,
+        0x02,
+        0x01,
+        0x04,
+        0x03,
+        0x02,
+        0x01,
+        0x04,
+        0x03,
+        0xa1,
+        0xa2,
+        0xa3,
+        0xa4};
+    mf_plus_crypto_build_read_iv(ti, 0x0102, 0x0304, iv);
+    mu_assert(memcmp(iv, exp_read_full, 16) == 0, "read IV counter-word mismatch");
+
+    const uint8_t exp_write_full[16] = {
+        0xa1,
+        0xa2,
+        0xa3,
+        0xa4,
+        0x02,
+        0x01,
+        0x04,
+        0x03,
+        0x02,
+        0x01,
+        0x04,
+        0x03,
+        0x02,
+        0x01,
+        0x04,
+        0x03};
+    mf_plus_crypto_build_write_iv(ti, 0x0102, 0x0304, iv);
+    mu_assert(memcmp(iv, exp_write_full, 16) == 0, "write IV counter-word mismatch");
+}
+
+#define TEXKOM_TEST_FRAME_SIZE (8)
+#define TEXKOM_TEST_TK13_GAPS  (127)
+#define TEXKOM_TEST_TK17_GAPS  (64)
+#define TEXKOM_TEST_IMPULSE    (1)
+#define TEXKOM_TEST_TK13_LONG  (17)
+#define TEXKOM_TEST_TK13_SHORT (7)
+/* The TK13 encoder writes both gaps of every bit and drops the trailing one afterwards, so
+ * it momentarily needs one more slot than it returns. */
+#define TEXKOM_TEST_MAX_GAPS   (TEXKOM_TEST_TK13_GAPS + 1)
+
+/**
+ * Gap trains are built here the way a tag builds them, from the timings in the Proxmark3
+ * implementation (armsrc/hfops.c, HfEncodeTkm), and then handed to our decoder. Encoding from the
+ * reference and decoding with the firmware means a transcription error in either direction shows
+ * up rather than cancelling out.
+ *
+ * Both frames below are the examples in PM3's own `hf texkom sim` help text, so their checksums
+ * are reference values and not something computed by the code under test.
+ */
+static const uint8_t texkom_test_tk13_frame[] = {0xFF, 0xFF, 0x63, 0x8C, 0x7D, 0xC4, 0x55, 0x53};
+static const uint8_t texkom_test_tk17_frame[] = {0xFF, 0xFF, 0xCA, 0x17, 0xF3, 0x1E, 0xC5, 0x12};
+
+/** TK17 gap pairs, one per two-bit value, as low times with the impulse added back on. */
+static const uint8_t texkom_test_tk17_pairs[4][2] = {
+    {25, 5}, // 00
+    {12, 18}, // 01
+    {17, 13}, // 10
+    {7, 23}, // 11
+};
+
+/** Most significant bit first, two gaps per bit, long gap first for a one. */
+static size_t texkom_test_encode_tk13(const uint8_t* frame, uint8_t* gaps) {
+    size_t count = 0;
+
+    for(size_t i = 0; i < TEXKOM_TEST_FRAME_SIZE; i++) {
+        for(size_t bit = 0; bit < 8; bit++) {
+            const bool one = (frame[i] << bit) & 0x80;
+            gaps[count++] =
+                TEXKOM_TEST_IMPULSE + (one ? TEXKOM_TEST_TK13_LONG : TEXKOM_TEST_TK13_SHORT);
+            gaps[count++] =
+                TEXKOM_TEST_IMPULSE + (one ? TEXKOM_TEST_TK13_SHORT : TEXKOM_TEST_TK13_LONG);
+        }
+    }
+
+    // The gap after the frame's final impulse falls in the pause between repetitions and is
+    // never measured, which is what leaves the last bit with only one gap.
+    return count - 1;
+}
+
+/** Least significant bit pair first, two gaps per pair. */
+static size_t texkom_test_encode_tk17(const uint8_t* frame, uint8_t* gaps) {
+    size_t count = 0;
+
+    for(size_t i = 0; i < TEXKOM_TEST_FRAME_SIZE; i++) {
+        for(size_t bit = 0; bit < 8; bit += 2) {
+            const uint8_t* pair = texkom_test_tk17_pairs[(frame[i] >> bit) & 0x03];
+            gaps[count++] = TEXKOM_TEST_IMPULSE + pair[0];
+            gaps[count++] = TEXKOM_TEST_IMPULSE + pair[1];
+        }
+    }
+
+    return count;
+}
+
+static void texkom_test_decodes_to(
+    const uint8_t* gaps,
+    size_t count,
+    const uint8_t* frame,
+    TexkomType type,
+    const char* what) {
+    TexkomData* data = texkom_alloc();
+
+    mu_assert(texkom_decode_intervals(data, gaps, count), what);
+    mu_assert(memcmp(data->frame, frame, TEXKOM_TEST_FRAME_SIZE) == 0, "decoded the wrong frame");
+    mu_assert_int_eq(type, data->type);
+    mu_assert(texkom_is_crc_valid(data), "decoded frame has a bad checksum");
+
+    texkom_free(data);
+}
+
+static void texkom_test_rejects(const uint8_t* gaps, size_t count, const char* what) {
+    TexkomData* data = texkom_alloc();
+
+    mu_assert(!texkom_decode_intervals(data, gaps, count), what);
+
+    texkom_free(data);
+}
+
+MU_TEST(texkom_decode_tk13) {
+    uint8_t gaps[TEXKOM_TEST_MAX_GAPS];
+    const size_t count = texkom_test_encode_tk13(texkom_test_tk13_frame, gaps);
+
+    mu_assert_int_eq(TEXKOM_TEST_TK13_GAPS, count);
+    texkom_test_decodes_to(
+        gaps, count, texkom_test_tk13_frame, TexkomTypeTk13, "TK13 did not round trip");
+
+    // Every decoder compares gaps against each other, so a slower tag must decode the same.
+    for(size_t i = 0; i < count; i++) {
+        gaps[i] *= 2;
+    }
+    texkom_test_decodes_to(
+        gaps, count, texkom_test_tk13_frame, TexkomTypeTk13, "TK13 is not scale invariant");
+}
+
+MU_TEST(texkom_decode_tk17) {
+    uint8_t gaps[TEXKOM_TEST_MAX_GAPS];
+    const size_t count = texkom_test_encode_tk17(texkom_test_tk17_frame, gaps);
+
+    mu_assert_int_eq(TEXKOM_TEST_TK17_GAPS, count);
+    // Covers all four bands: the UID below spans every two-bit value.
+    texkom_test_decodes_to(
+        gaps, count, texkom_test_tk17_frame, TexkomTypeTk17, "TK17 did not round trip");
+
+    for(size_t i = 0; i < count; i++) {
+        gaps[i] *= 4;
+    }
+    texkom_test_decodes_to(
+        gaps, count, texkom_test_tk17_frame, TexkomTypeTk17, "TK17 is not scale invariant");
+}
+
+MU_TEST(texkom_decode_tk15) {
+    uint8_t gaps[TEXKOM_TEST_MAX_GAPS];
+    const size_t count = texkom_test_encode_tk13(texkom_test_tk13_frame, gaps);
+
+    // TK15 is the same coding with timings too ragged for absolute thresholds. Gaps merely one
+    // apart are not enough to get there - the TK13 decoder still separates those - so pull some
+    // long gaps to the midpoint, which lands outside *both* tolerance bands. That makes this test
+    // depend on the (hi - low) / 3 + 1 tolerance in texkom_decode_tk13: widen that divisor and
+    // this fails rather than the decoder. The final gap is left alone, since it is the only
+    // evidence for the last bit and jittering it legitimately flips that bit.
+    for(size_t i = 0; i + 1 < count; i += 9) {
+        if(gaps[i] == TEXKOM_TEST_IMPULSE + TEXKOM_TEST_TK13_LONG) {
+            gaps[i] = (TEXKOM_TEST_TK13_LONG + TEXKOM_TEST_TK13_SHORT) / 2 + TEXKOM_TEST_IMPULSE;
+        }
+    }
+
+    texkom_test_decodes_to(
+        gaps, count, texkom_test_tk13_frame, TexkomTypeTk15, "TK15 fallback did not round trip");
+}
+
+MU_TEST(texkom_decode_mmbit) {
+    // MMBIT keeps FF in the type byte and the one after it, leaving 3 bytes of UID at offset 4
+    // and a checksum in the high nibble only.
+    uint8_t frame[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x12, 0x34, 0x56, 0x0A};
+    TexkomData* data = texkom_alloc();
+
+    data->type = TexkomTypeMmbit;
+    memcpy(data->frame, frame, sizeof(frame));
+
+    // The low nibble is payload, not checksum: it must survive an update and be ignored by the
+    // check.
+    texkom_update_crc(data);
+    mu_assert_int_eq(0x0A, data->frame[7] & 0x0F);
+    mu_assert(texkom_is_crc_valid(data), "MMBIT checksum rejected its own value");
+
+    frame[7] = data->frame[7];
+    texkom_free(data);
+
+    uint8_t gaps[TEXKOM_TEST_MAX_GAPS];
+    const size_t count = texkom_test_encode_tk13(frame, gaps);
+    texkom_test_decodes_to(gaps, count, frame, TexkomTypeMmbit, "MMBIT did not round trip");
+}
+
+MU_TEST(texkom_decode_rejects_junk) {
+    uint8_t gaps[TEXKOM_TEST_MAX_GAPS];
+    size_t count = texkom_test_encode_tk13(texkom_test_tk13_frame, gaps);
+
+    // One gap short of a TK13 frame is refused by the length gate before any decoder runs, which
+    // is also what stops a short capture reaching the decoders' furi_check on the count.
+    texkom_test_rejects(gaps, count - 1, "accepted a frame one gap short");
+
+    // Gaps that all classify the same way cannot carry bits.
+    memset(gaps, 10, sizeof(gaps));
+    texkom_test_rejects(gaps, count, "accepted uniform gaps");
+
+    // A frame whose preamble is not FF FF is noise, however well formed the gaps are.
+    uint8_t bad_preamble[TEXKOM_TEST_FRAME_SIZE];
+    memcpy(bad_preamble, texkom_test_tk13_frame, sizeof(bad_preamble));
+    bad_preamble[0] = 0x7F;
+    count = texkom_test_encode_tk13(bad_preamble, gaps);
+    texkom_test_rejects(gaps, count, "accepted a frame without the preamble");
+
+    // A type byte naming no known variant is rejected rather than saved as "unknown".
+    uint8_t bad_type[TEXKOM_TEST_FRAME_SIZE];
+    memcpy(bad_type, texkom_test_tk13_frame, sizeof(bad_type));
+    bad_type[2] = 0x42;
+    count = texkom_test_encode_tk13(bad_type, gaps);
+    texkom_test_rejects(gaps, count, "accepted a frame with an unknown type byte");
+
+    // TK17 pairs always span the same total; a lopsided split is none of the four bands.
+    count = texkom_test_encode_tk17(texkom_test_tk17_frame, gaps);
+    gaps[0] = 29;
+    gaps[1] = 1;
+    texkom_test_rejects(gaps, count, "accepted a lopsided TK17 pair");
+
+    // A frame must name a variant that uses the coding it arrived in. This is the invariant that
+    // lets everything downstream read the variant off the type byte, so both directions of
+    // disagreement have to be refused.
+    count = texkom_test_encode_tk17(texkom_test_tk13_frame, gaps);
+    texkom_test_rejects(gaps, count, "accepted a TK13 type byte in TK17 coding");
+
+    count = texkom_test_encode_tk13(texkom_test_tk17_frame, gaps);
+    texkom_test_rejects(gaps, count, "accepted a TK17 type byte in TK13 coding");
+}
+
+MU_TEST(texkom_crc_reference_values) {
+    TexkomData* data = texkom_alloc();
+
+    // Both checksums below come from PM3's own help text, so they are reference values.
+    data->type = TexkomTypeTk13;
+    memcpy(data->frame, texkom_test_tk13_frame, TEXKOM_TEST_FRAME_SIZE);
+    mu_assert(texkom_is_crc_valid(data), "TK13 reference checksum rejected");
+
+    data->frame[3] ^= 0xFF;
+    mu_assert(!texkom_is_crc_valid(data), "TK13 checksum accepted a changed UID");
+
+    data->type = TexkomTypeTk17;
+    memcpy(data->frame, texkom_test_tk17_frame, TEXKOM_TEST_FRAME_SIZE);
+    mu_assert(texkom_is_crc_valid(data), "TK17 reference checksum rejected");
+
+    data->frame[6] ^= 0xFF;
+    mu_assert(!texkom_is_crc_valid(data), "TK17 checksum accepted a changed UID");
+
+    // MMBIT has no reference frame in PM3's help text, so this literal is the only place the
+    // expected value lives: nibble XOR of 12 34 56, inverted, in the high nibble.
+    const uint8_t mmbit[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x12, 0x34, 0x56, 0x00};
+    data->type = TexkomTypeMmbit;
+    memcpy(data->frame, mmbit, sizeof(mmbit));
+    texkom_update_crc(data);
+    mu_assert_int_eq(0x80, data->frame[7]);
+
+    texkom_free(data);
+}
+
+MU_TEST(texkom_expected_crc) {
+    TexkomData* data = texkom_alloc();
+    uint8_t expected = 0;
+
+    // The info screen prints this against the stored byte, so it has to be the whole byte and it
+    // has to agree with what texkom_update_crc() would write.
+    data->type = TexkomTypeTk13;
+    memcpy(data->frame, texkom_test_tk13_frame, TEXKOM_TEST_FRAME_SIZE);
+    const uint8_t stored = data->frame[TEXKOM_TEST_FRAME_SIZE - 1];
+    data->frame[TEXKOM_TEST_FRAME_SIZE - 1] ^= 0xFF;
+    mu_assert(texkom_get_expected_crc(data, &expected), "TK13 has no expected checksum");
+    mu_assert_int_eq(stored, expected);
+
+    // MMBIT owns only the high nibble, so the low one has to come back as it is stored - that is
+    // what makes the printed byte comparable with the frame.
+    const uint8_t mmbit[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x12, 0x34, 0x56, 0x0A};
+    data->type = TexkomTypeMmbit;
+    memcpy(data->frame, mmbit, sizeof(mmbit));
+    mu_assert(texkom_get_expected_crc(data, &expected), "MMBIT has no expected checksum");
+    mu_assert_int_eq(0x8A, expected);
+
+    // A variant with no checksum says so rather than making one up.
+    data->type = TexkomTypeUnknown;
+    mu_assert(!texkom_get_expected_crc(data, &expected), "Unknown invented a checksum");
+
+    texkom_free(data);
+}
+
+MU_TEST(texkom_make_blank_frames) {
+    TexkomData* data = texkom_alloc();
+
+    // What Add Manually generates has to be a frame the load path would accept, because the user
+    // saves it and reads it back: FF FF markers, the variant's own type byte, and a checksum that
+    // agrees with the UID.
+    mu_assert(texkom_make_blank(data, TexkomTypeTk13), "TK13 refused");
+    mu_assert_int_eq(TexkomTypeTk13, data->type);
+    mu_assert_int_eq(0xFF, data->frame[0]);
+    mu_assert_int_eq(0xFF, data->frame[1]);
+    mu_assert_int_eq(0x63, data->frame[2]);
+    mu_assert(texkom_is_crc_valid(data), "TK13 blank has a bad checksum");
+
+    // TK15 is the same frame as TK13 - the variants differ in timing, not content.
+    uint8_t tk13_frame[TEXKOM_TEST_FRAME_SIZE];
+    memcpy(tk13_frame, data->frame, TEXKOM_TEST_FRAME_SIZE);
+    mu_assert(texkom_make_blank(data, TexkomTypeTk15), "TK15 refused");
+    mu_assert(memcmp(tk13_frame, data->frame, TEXKOM_TEST_FRAME_SIZE) == 0, "TK15 differs");
+
+    mu_assert(texkom_make_blank(data, TexkomTypeTk17), "TK17 refused");
+    mu_assert_int_eq(0xCA, data->frame[2]);
+    mu_assert(texkom_is_crc_valid(data), "TK17 blank has a bad checksum");
+
+    // MMBIT spends frame[3] on a second marker, which the load path checks for.
+    mu_assert(texkom_make_blank(data, TexkomTypeMmbit), "MMBIT refused");
+    mu_assert_int_eq(0xFF, data->frame[2]);
+    mu_assert_int_eq(0xFF, data->frame[3]);
+    mu_assert(texkom_is_crc_valid(data), "MMBIT blank has a bad checksum");
+
+    // A blank still has to take a UID of the variant's own length and stay consistent.
+    const uint8_t uid[] = {0xAA, 0xBB, 0xCC};
+    mu_assert(texkom_set_uid(data, uid, TEXKOM_MMBIT_UID_SIZE), "MMBIT blank refused a UID");
+    mu_assert(texkom_is_crc_valid(data), "UID on a blank left a bad checksum");
+
+    // Unknown names no variant, so there is nothing to lay down.
+    mu_assert(!texkom_make_blank(data, TexkomTypeUnknown), "Unknown accepted");
+    mu_assert(!texkom_make_blank(data, TexkomTypeNum), "Out-of-range type accepted");
+
+    texkom_free(data);
+}
+
+MU_TEST(texkom_uid_accessors) {
+    TexkomData* data = texkom_alloc();
+    size_t uid_len = 0;
+
+    // Every variant but MMBIT keeps a 4-byte UID at offset 3.
+    data->type = TexkomTypeTk13;
+    memcpy(data->frame, texkom_test_tk13_frame, TEXKOM_TEST_FRAME_SIZE);
+    const uint8_t* uid = texkom_get_uid(data, &uid_len);
+    mu_assert_int_eq(TEXKOM_UID_SIZE, uid_len);
+    mu_assert(uid == &data->frame[TEXKOM_UID_OFFSET], "TK13 UID is not at offset 3");
+
+    // Setting a UID of the right length has to leave the checksum consistent, which is what the
+    // Edit UID screen relies on.
+    const uint8_t replacement[] = {0x11, 0x22, 0x33, 0x44};
+    mu_assert(texkom_set_uid(data, replacement, sizeof(replacement)), "TK13 set_uid refused");
+    mu_assert(memcmp(&data->frame[TEXKOM_UID_OFFSET], replacement, 4) == 0, "UID not stored");
+    mu_assert(texkom_is_crc_valid(data), "set_uid left a bad checksum");
+
+    // A length the variant does not use is refused rather than written somewhere else.
+    mu_assert(!texkom_set_uid(data, replacement, 3), "TK13 accepted a 3-byte UID");
+    mu_assert(!texkom_set_uid(data, replacement, 0), "TK13 accepted an empty UID");
+
+    // MMBIT keeps 3 bytes at offset 4, and its low checksum nibble is payload.
+    data->type = TexkomTypeMmbit;
+    uid = texkom_get_uid(data, &uid_len);
+    mu_assert_int_eq(TEXKOM_MMBIT_UID_SIZE, uid_len);
+    mu_assert(uid == &data->frame[TEXKOM_MMBIT_UID_OFFSET], "MMBIT UID is not at offset 4");
+
+    data->frame[7] = 0x0A;
+    mu_assert(texkom_set_uid(data, replacement, TEXKOM_MMBIT_UID_SIZE), "MMBIT set_uid refused");
+    mu_assert_int_eq(0x0A, data->frame[7] & 0x0F);
+    mu_assert(texkom_is_crc_valid(data), "MMBIT set_uid left a bad checksum");
+    mu_assert(!texkom_set_uid(data, replacement, 4), "MMBIT accepted a 4-byte UID");
+
+    texkom_free(data);
+}
+
+static void texkom_file_test(TexkomType type, const uint8_t* frame) {
+    NfcDevice* nfc_device = nfc_device_alloc();
+    TexkomData* data = texkom_alloc();
+
+    data->type = type;
+    memcpy(data->frame, frame, TEXKOM_TEST_FRAME_SIZE);
+
+    nfc_device_set_data(nfc_device, NfcProtocolTexkom, data);
+    nfc_test_save_and_load(nfc_device);
+
+    texkom_free(data);
+    nfc_device_free(nfc_device);
+}
+
+MU_TEST(texkom_file_tests) {
+    // MMBIT is the interesting one: its 3-byte UID is the shortest any protocol writes to the
+    // shared Uid key, and the loader sets the UID before the frame, when the type is not yet
+    // known.
+    const uint8_t mmbit[] = {0xFF, 0xFF, 0xFF, 0xFF, 0x12, 0x34, 0x56, 0x80};
+
+    texkom_file_test(TexkomTypeTk13, texkom_test_tk13_frame);
+    texkom_file_test(TexkomTypeTk15, texkom_test_tk13_frame);
+    texkom_file_test(TexkomTypeTk17, texkom_test_tk17_frame);
+    texkom_file_test(TexkomTypeMmbit, mmbit);
+}
+
 MU_TEST_SUITE(nfc) {
     nfc_test_alloc();
 
@@ -1060,12 +1643,27 @@ MU_TEST_SUITE(nfc) {
     MU_RUN_TEST(felica_standard_file_test);
     MU_RUN_TEST(felica_standard_v2_file_test);
     MU_RUN_TEST(felica_standard_v3_file_test);
+    MU_RUN_TEST(felica_oversized_lite_file_test);
     MU_RUN_TEST(felica_standard_read);
 
     MU_RUN_TEST(slix_file_with_capabilities_test);
     MU_RUN_TEST(slix_set_password_default_cap_correct_pass);
     MU_RUN_TEST(slix_set_password_default_cap_incorrect_pass);
     MU_RUN_TEST(slix_set_password_access_all_passwords_cap);
+
+    MU_RUN_TEST(mf_plus_crypto_cmac_rfc4493);
+    MU_RUN_TEST(mf_plus_crypto_data_iv_layout);
+
+    MU_RUN_TEST(texkom_decode_tk13);
+    MU_RUN_TEST(texkom_decode_tk15);
+    MU_RUN_TEST(texkom_decode_tk17);
+    MU_RUN_TEST(texkom_decode_mmbit);
+    MU_RUN_TEST(texkom_decode_rejects_junk);
+    MU_RUN_TEST(texkom_crc_reference_values);
+    MU_RUN_TEST(texkom_expected_crc);
+    MU_RUN_TEST(texkom_make_blank_frames);
+    MU_RUN_TEST(texkom_uid_accessors);
+    MU_RUN_TEST(texkom_file_tests);
 
     nfc_test_free();
 }

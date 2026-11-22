@@ -5,6 +5,8 @@
 
 #include "protocol_common_i.h"
 
+#include "../ibutton_write_targets.h"
+
 typedef void iButtonProtocolGroupData;
 typedef int32_t iButtonProtocolGroupId;
 
@@ -26,8 +28,9 @@ typedef bool (*iButtonProtocolGroupIsValidFunc)(
 /**
  * Check whether the protocol can program the data into a blank.
  *
- * Data that fails is_valid() can still be writable, for example a Dallas key
- * with a wrong CRC: the key will not read back, but it can be written as is.
+ * Deliberately not is_valid(): the two ask different questions. A Dallas ROM whose CRC
+ * does not match is still something a blank can carry, and writing one is a thing people
+ * do on purpose, while a Metakom frame with odd parity is not a frame at all.
  */
 typedef bool (*iButtonProtocolGroupIsWritableFunc)(
     iButtonProtocolGroupData*,
@@ -68,6 +71,15 @@ typedef bool (*iButtonProtocolGroupWriteFunc)(
     iButtonProtocolData*,
     iButtonProtocolLocalId);
 
+typedef iButtonWriteTargetMask (
+    *iButtonProtocolGroupGetTargetsFunc)(iButtonProtocolGroupData*, iButtonProtocolLocalId);
+
+typedef bool (*iButtonProtocolGroupWriteIdFunc)(
+    iButtonProtocolGroupData*,
+    iButtonProtocolData*,
+    iButtonProtocolLocalId,
+    const iButtonWriteTargetContext*);
+
 typedef bool (*iButtonProtocolGroupSaveFunc)(
     iButtonProtocolGroupData*,
     const iButtonProtocolData*,
@@ -95,7 +107,9 @@ typedef struct {
     iButtonProtocolGroupGetStringFunc get_name;
 
     iButtonProtocolGroupReadFunc read;
-    iButtonProtocolGroupWriteFunc write_id;
+    iButtonProtocolGroupGetTargetsFunc get_write_targets;
+
+    iButtonProtocolGroupWriteIdFunc write_id;
     iButtonProtocolGroupWriteFunc write_copy;
 
     iButtonProtocolGroupApplyFunc emulate_start;

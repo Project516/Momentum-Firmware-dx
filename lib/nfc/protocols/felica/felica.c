@@ -144,7 +144,7 @@ bool felica_load(FelicaData* data, FlipperFormat* ff, uint32_t version) {
             uint32_t blocks_read = 0;
             if(!flipper_format_read_uint32(ff, "Blocks total", &blocks_total, 1)) break;
             if(!flipper_format_read_uint32(ff, "Blocks read", &blocks_read, 1)) break;
-            if((blocks_total > FELICA_BLOCKS_TOTAL_COUNT) || (blocks_read > blocks_total)) {
+            if(blocks_total > FELICA_BLOCKS_TOTAL_COUNT || blocks_read > blocks_total) {
                 parsed = false;
                 break;
             }
@@ -533,7 +533,7 @@ bool felica_is_equal(const FelicaData* data, const FelicaData* other) {
            memcmp(data->pmm.data, other->pmm.data, sizeof(FelicaPMm)) == 0 &&
            data->blocks_total == other->blocks_total && data->blocks_read == other->blocks_read &&
            memcmp(&data->data, &other->data, sizeof(data->data)) == 0 &&
-           simple_array_is_equal(data->systems, other->systems);
+           felica_system_array_is_equal(data->systems, other->systems);
 }
 
 const char* felica_get_device_name(const FelicaData* data, NfcDeviceNameType name_type) {

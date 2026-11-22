@@ -212,12 +212,13 @@ Iso14443_3aError
                     &instance->col_res.sel_resp,
                     sizeof(instance->col_res.sel_resp));
                 FURI_LOG_T(TAG, "Sel resp: %02X", instance->col_res.sel_resp.sak);
-                // The SAK cascade bit is the authority on UID completeness, not the first
-                // UID byte: a real 4-byte UID can begin with the 0x88 cascade tag value
-                // (non-compliant, but seen on some MIFARE Classic / magic cards).
+                // The SAK cascade bit is the authority on UID completeness, not the
+                // first UID byte: a real 4-byte UID can begin with the 0x88 cascade tag
+                // value (non-compliant, but seen on some MIFARE Classic / magic cards).
                 if(instance->col_res.sel_resp.sak & ISO14443_3A_POLLER_SAK_CASCADE_BIT) {
-                    if((instance->col_res.cascade_level >= ISO14443_3A_POLLER_MAX_CASCADE_LEVEL) ||
-                       (instance->data->uid_len + 3U > ISO14443_3A_MAX_UID_SIZE)) {
+                    // ISO14443-3 defines at most 3 cascade levels (10-byte UID); a tag
+                    // that keeps asserting the cascade bit would overflow data->uid[10].
+                    if(instance->col_res.cascade_level >= 2) {
                         FURI_LOG_E(TAG, "Too many cascade levels");
                         instance->state = Iso14443_3aPollerStateColResFailed;
                         ret = Iso14443_3aErrorColResFailed;
@@ -232,12 +233,6 @@ Iso14443_3aError
                     instance->col_res.cascade_level++;
                     instance->col_res.state = Iso14443_3aPollerColResStateStateNewCascade;
                 } else {
-                    if(instance->data->uid_len + 4U > ISO14443_3A_MAX_UID_SIZE) {
-                        FURI_LOG_E(TAG, "UID too long");
-                        instance->state = Iso14443_3aPollerStateColResFailed;
-                        ret = Iso14443_3aErrorColResFailed;
-                        break;
-                    }
                     FURI_LOG_T(TAG, "Col resolution complete");
                     instance->data->sak = instance->col_res.sel_resp.sak;
                     memcpy(

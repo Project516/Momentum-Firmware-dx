@@ -243,7 +243,9 @@ static uint32_t furi_hal_rfid_capture_origin = 0;
 
 // Counter free-runs; consecutive captures are differenced. Zeroing it here happened one interrupt
 // latency after the edge, so every reported duration read short by it. uint32_t wraparound is
-// self-correcting. CC3 (falling) must precede CC4 (rising) so a high width uses its own cycle's origin.
+// self-correcting, because Autoreload is UINT32_MAX above: the counter is a full 32 bit free runner
+// at 1 MHz, so it wraps every ~71 minutes against captures measured in milliseconds. CC3 (falling)
+// must precede CC4 (rising) so a high width uses its own cycle's origin.
 static void furi_hal_capture_dma_isr(void* context) {
     UNUSED(context);
 
