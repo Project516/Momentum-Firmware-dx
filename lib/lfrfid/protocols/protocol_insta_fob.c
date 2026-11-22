@@ -80,6 +80,7 @@ void protocol_insta_fob_decoder_start(ProtocolInstaFob* protocol) {
     protocol->encoded_term_state = ProtocolInstaFobSeqTermNone;
 }
 
+#ifndef LOGS_RELEASE_BUILD
 static const char* protocol_insta_fob_get_encoded_data(ProtocolInstaFob* protocol) {
     furi_string_reset(protocol->debug_string);
     for(size_t i = 0; i < INSTAFOB_ENCODED_DATA_SIZE_BITS; i++) {
@@ -88,6 +89,7 @@ static const char* protocol_insta_fob_get_encoded_data(ProtocolInstaFob* protoco
     }
     return furi_string_get_cstr(protocol->debug_string);
 }
+#endif
 
 static bool protocol_insta_fob_can_be_decoded(ProtocolInstaFob* protocol) {
     return bit_lib_get_bits_32(protocol->encoded_data, INSTAFOB_ENCODED_DATA_OFFSET, 32) ==
