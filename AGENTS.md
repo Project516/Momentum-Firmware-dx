@@ -25,14 +25,13 @@ releases them.
 Merge `ofw/dev` into `dev` with the message
 `chore: merge flipperzero-firmware dev into dev`.
 
-Take the API version from OFW `dev` as merged. Do not pin it to the release
-value: the Apps catalog serves release SDK builds for any newer minor version,
-and the firmware loads them.
+Keep the API version pinned to the OFW `release` value in both targets, even
+when OFW `dev` or Unleashed raise it. CI fails on any other value.
 
 ## Checks
 
-- `./fbt` builds the firmware. `./fbt updater_package` builds the update
-  package.
+- CI runs `./fbt copro_dist updater_package fap_dist`, then fails if the build
+  changed any tracked file (fbt rewrites `api_symbols.csv` on new symbols).
 - `./fbt lint_all` checks formatting.
 - `./fbt FIRMWARE_APP_SET=unit_tests updater_package` builds the unit test
   firmware. It runs the tests on boot and shows the result on screen.
