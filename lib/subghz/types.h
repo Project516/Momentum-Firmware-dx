@@ -110,6 +110,9 @@ typedef struct {
     SubGhzGetString get_string;
     SubGhzSerialize serialize;
     SubGhzDeserialize deserialize;
+
+    SubGhzGetHashDataLong get_hash_data_long;
+    SubGhzGetStringBrief get_string_brief;
     SubGhzGetType get_type; // optional, see SubGhzGetType
 } SubGhzProtocolDecoder;
 
