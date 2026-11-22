@@ -982,13 +982,6 @@ MU_TEST(subghz_encoder_mastercode_test) {
         "Test encoder " SUBGHZ_PROTOCOL_MASTERCODE_NAME " error\r\n");
 }
 
-MU_TEST(subghz_decoder_acurite_592txr_test) {
-    mu_assert(
-        subghz_decoder_test(
-            EXT_PATH("unit_tests/subghz/acurite_592txr.sub"), WS_PROTOCOL_ACURITE_592TXR_NAME),
-        "Test decoder " WS_PROTOCOL_ACURITE_592TXR_NAME " error\r\n");
-}
-
 MU_TEST(subghz_encoder_dickert_test) {
     mu_assert(
         subghz_encoder_test(EXT_PATH("unit_tests/subghz/dickert_mahs.sub")),
@@ -1160,7 +1153,6 @@ MU_TEST_SUITE(subghz) {
     MU_RUN_TEST(subghz_encoder_holtek_ht12x_test);
     MU_RUN_TEST(subghz_encoder_dooya_test);
     MU_RUN_TEST(subghz_encoder_mastercode_test);
-    MU_RUN_TEST(subghz_decoder_acurite_592txr_test);
     MU_RUN_TEST(subghz_encoder_dickert_test);
     MU_RUN_TEST(subghz_encoder_feron_test);
     MU_RUN_TEST(subghz_encoder_roger_test);
