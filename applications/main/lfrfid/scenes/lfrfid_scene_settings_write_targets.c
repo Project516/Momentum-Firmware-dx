@@ -22,11 +22,6 @@ static void lfrfid_scene_settings_enter_callback_none(void* context, uint32_t in
 void lfrfid_scene_settings_write_targets_on_enter(void* context) {
     LfRfid* app = context;
 
-    // Mapping the plugin is an SD read and the menu behind us is already gone. Leaving the
-    // loading view also resets the input queue, so a Back pressed during the read cannot pop
-    // the scene a failure is about to be reported on.
-    view_dispatcher_show_loading(app->view_dispatcher);
-
     settings_plugin = NULL;
     settings_plugin_manager = plugin_manager_alloc(
         LFRFID_SETTINGS_PLUGIN_APP_ID, LFRFID_SETTINGS_PLUGIN_API_VERSION, firmware_api_interface);

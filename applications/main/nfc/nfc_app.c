@@ -480,18 +480,16 @@ void nfc_show_loading_popup(void* context, bool show) {
     nfc_show_loading_view(nfc, NfcViewLoading, show);
 }
 
+// The loading view has no label or progress bar here, so the text and progress are dropped
 void nfc_show_loading_label_popup(void* context, const char* text, bool show) {
     NfcApp* nfc = context;
-    if(show) {
-        loading_reset_progress(nfc->loading_label);
-        loading_set_text(nfc->loading_label, text);
-    }
+    UNUSED(text);
     nfc_show_loading_view(nfc, NfcViewLoadingLabel, show);
 }
 
 void nfc_set_loading_label_progress(void* context, float progress) {
-    NfcApp* nfc = context;
-    loading_set_progress(nfc->loading_label, progress);
+    UNUSED(context);
+    UNUSED(progress);
 }
 
 void nfc_append_filename_string_when_present(NfcApp* instance, FuriString* string) {
