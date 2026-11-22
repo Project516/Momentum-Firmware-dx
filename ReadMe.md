@@ -1,3 +1,5 @@
+<p align="center"><img src=".github/assets/mdx_wordmark.png" alt="Momentum-dx" width="300"></p>
+
 # Momentum-dx
 
 A bleeding-edge fork of Momentum Firmware for the Flipper Zero.
