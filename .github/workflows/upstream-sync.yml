@@ -1,0 +1,162 @@
+name: "Upstream sync"
+
+on:
+  schedule:
+    - cron: "0 14 * * 0"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  actions: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+env:
+  GH_TOKEN: ${{ github.token }}
+  APPS_REPO: momentum-dx/Momentum-Apps
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: false
+
+      - name: "Set git identity"
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: "Fetch OFW release API version"
+        run: |
+          curl -fsS -o "$RUNNER_TEMP/api_full.csv" "https://raw.githubusercontent.com/flipperdevices/flipperzero-firmware/release/targets/f7/api_symbols.csv"
+          head -n2 "$RUNNER_TEMP/api_full.csv" > "$RUNNER_TEMP/api_head.csv"
+          sed -n 2p "$RUNNER_TEMP/api_head.csv" | grep -q '^Version,'
+
+      - name: "Sync upstreams and apps"
+        run: |
+          set -uo pipefail
+          git fetch --no-tags origin dev
+
+          open_prs() { gh pr list --head "$1" --state open --json number --jq '.[].number'; }
+
+          open_issues() {
+            gh issue list --state open --search "\"$1\" in:title" --json number,title \
+              --jq ".[] | select(.title == \"$1\") | .number"
+          }
+
+          # Push the branch unless the remote copy already has the same tree on the current base.
+          # Then open or update the PR and start the checks that GITHUB_TOKEN pushes do not trigger.
+          publish() {
+            branch=$1 title=$2 body=$3
+            shift 3
+            if git fetch --no-tags origin "$branch" 2> /dev/null \
+              && git diff --quiet FETCH_HEAD HEAD \
+              && git merge-base --is-ancestor origin/dev FETCH_HEAD \
+              && git merge-base --is-ancestor "$@" FETCH_HEAD; then
+              pushed=0
+            else
+              git push --force-with-lease origin "$branch" || return 1
+              pushed=1
+            fi
+            prs=$(open_prs "$branch")
+            if [ -n "$prs" ]; then
+              for n in $prs; do gh pr edit "$n" --body "$body"; done
+            else
+              gh pr create --base dev --head "$branch" --title "$title" --body "$body" || return 1
+              pushed=1
+            fi
+            if [ "$pushed" -eq 1 ]; then
+              gh workflow run build.yml --ref "$branch"
+              gh workflow run lint.yml --ref "$branch"
+            fi
+          }
+
+          pr_body() {
+            printf "# What's new\n\n- %s\n\n# For the reviewer\n\n- [ ] Build and Lint checks pass\n- [ ] I've uploaded the firmware with this patch to a device and verified its functionality\n" "$1"
+          }
+
+          sync_upstream() {
+            name=$1 repo=$2 msg=$3
+            branch="sync/$name"
+            title="Upstream sync: $name has conflicts"
+            git fetch --no-tags "https://github.com/$repo.git" "dev:refs/remotes/$name/dev" || return 1
+            count=$(git rev-list --count "origin/dev..$name/dev")
+            prs=$(open_prs "$branch")
+            issues=$(open_issues "$title")
+
+            if [ "$count" -eq 0 ]; then
+              for n in $prs; do gh pr close "$n" --comment "Closing: $name dev has no commits missing from dev."; done
+              for n in $issues; do gh issue close "$n" --comment "Closing: $name dev has no commits missing from dev."; done
+              return 0
+            fi
+
+            base=$(git merge-base origin/dev "$name/dev")
+            compare="https://github.com/$repo/compare/$base...$(git rev-parse "$name/dev")"
+            git switch -C "$branch" origin/dev
+
+            if ! git merge --no-ff -m "$msg" "$name/dev"; then
+              files=$(git diff --name-only --diff-filter=U)
+              git merge --abort
+              git switch --detach origin/dev
+              body=$(printf 'Merging `%s/dev` into `dev` conflicts in:\n\n%s\n\nUpstream commits (%s): %s\n\nMerge it by hand.\n' \
+                "$name" "$(sed 's/^/- `/; s/$/`/' <<< "${files:-(none listed, the merge failed)}")" "$count" "$compare")
+              if [ -n "$issues" ]; then
+                for n in $issues; do gh issue edit "$n" --body "$body"; done
+              else
+                gh issue create --title "$title" --body "$body" || return 1
+              fi
+              for n in $prs; do gh pr close "$n" --comment "Closing: $name dev now conflicts with dev."; done
+              return 0
+            fi
+
+            for n in $issues; do gh issue close "$n" --comment "Closing: $name dev now merges cleanly."; done
+
+            for f in targets/f7/api_symbols.csv targets/f18/api_symbols.csv; do
+              { cat "$RUNNER_TEMP/api_head.csv"; tail -n +3 "$f"; } > "$RUNNER_TEMP/api.tmp" && cp "$RUNNER_TEMP/api.tmp" "$f"
+            done
+            if ! git diff --quiet; then
+              git commit -m "chore: pin API version to the OFW release value" targets/f7/api_symbols.csv targets/f18/api_symbols.csv
+            fi
+
+            publish "$branch" "$msg" \
+              "$(pr_body "Merges \`$name/dev\` into \`dev\` ($count new commits): $compare. Test on a device before merging.")" \
+              "$name/dev"
+          }
+
+          sync_apps() {
+            branch=sync/apps
+            msg="chore: update bundled apps from Momentum-Apps dev"
+            pinned=$(git rev-parse origin/dev:applications/external)
+            tip=$(gh api "repos/$APPS_REPO/commits/dev" --jq .sha) || return 1
+            status=$(gh api "repos/$APPS_REPO/compare/$pinned...$tip" --jq .status) || return 1
+            prs=$(open_prs "$branch")
+
+            if [ "$status" != ahead ]; then
+              for n in $prs; do gh pr close "$n" --comment "Closing: the bundled apps are up to date."; done
+              return 0
+            fi
+
+            count=$(gh api "repos/$APPS_REPO/compare/$pinned...$tip" --jq .ahead_by)
+            git switch -C "$branch" origin/dev
+            git update-index --cacheinfo "160000,$tip,applications/external"
+            git commit -m "$msg"
+            publish "$branch" "$msg" \
+              "$(pr_body "Moves the bundled apps from \`${pinned:0:12}\` to \`${tip:0:12}\` ($count new commits): https://github.com/$APPS_REPO/compare/$pinned...$tip. Test on a device before merging.")" \
+              origin/dev
+          }
+
+          failed=0
+          sync_upstream ofw flipperdevices/flipperzero-firmware "chore: merge flipperzero-firmware dev into dev" || failed=1
+          sync_upstream mntm Next-Flip/Momentum-Firmware "chore: merge momentum-firmware dev into dev" || failed=1
+          sync_upstream ul DarkFlippers/unleashed-firmware "chore: merge unleashed-firmware dev into dev" || failed=1
+          sync_apps || failed=1
+          exit $failed

@@ -25,13 +25,21 @@ releases them.
 - **API version**: the `Version` row in `targets/*/api_symbols.csv`. The
   mobile app sends it to the Apps catalog to pick app builds.
 
-## Syncing OFW
+## Syncing upstreams
 
-Merge `ofw/dev` into `dev` with the message
-`chore: merge flipperzero-firmware dev into dev`.
+The `Upstream sync` workflow runs weekly (Sundays) and on demand. For each of
+OFW, mntm and Unleashed (`ul`), it merges `dev` into a `sync/<name>` branch and
+opens a PR. It also bumps the `applications/external` pin to the Momentum-Apps
+`dev` tip (`sync/apps`).
 
-Keep the API version pinned to the OFW `release` value in both targets, even
-when OFW `dev` or Unleashed raise it. CI fails on any other value.
+The workflow keeps the API version pinned to the OFW `release` value in both
+targets, even when OFW `dev` or Unleashed raise it. CI fails on any other value.
+
+- **Sync PR:** wait for Build and Lint, test the firmware on a device, then merge
+  with a merge commit. Never squash a merge.
+- **Conflict issue:** merge by hand with the message `chore: merge <repo> dev
+  into dev`. Where Momentum and Unleashed conflict, keep the Momentum UI and
+  the Unleashed protocol logic, then re-pin the API version.
 
 ## Releasing
 
