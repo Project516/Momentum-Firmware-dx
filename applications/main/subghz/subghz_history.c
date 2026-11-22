@@ -1,5 +1,6 @@
 #include "subghz_history.h"
 #include <lib/subghz/receiver.h>
+#include <lib/subghz/protocols/keeloq.h>
 #include <rpc/rpc.h>
 
 #include <furi.h>
@@ -311,6 +312,12 @@ bool subghz_history_add_to_history(
             if(!flipper_format_read_string(item->flipper_string, "Manufacture", text)) {
                 FURI_LOG_E(TAG, "Missing Protocol");
                 break;
+            }
+            uint32_t te = 0;
+            if(flipper_format_rewind(item->flipper_string) &&
+               flipper_format_read_uint32(item->flipper_string, "TE", &te, 1) &&
+               te == KEELOQ_TE_FAST) {
+                furi_string_set(instance->tmp_string, "KL HR ");
             }
             furi_string_cat(instance->tmp_string, text);
         }
