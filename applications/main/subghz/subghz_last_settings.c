@@ -28,8 +28,8 @@
 
 // Flags the receiver config can ignore; extend when adding a new "Ignore ..." option
 #define SUBGHZ_LAST_SETTING_IGNORE_FILTER_MASK                                               \
-    (SubGhzProtocolFlag_ReversRB2 | SubGhzProtocolFlag_Alarms | SubGhzProtocolFlag_Sensors | \
-     SubGhzProtocolFlag_Princeton | SubGhzProtocolFlag_NiceFlorS)
+    (SubGhzProtocolFilter_ReversRB2 | SubGhzProtocolFilter_Alarms | SubGhzProtocolFilter_Sensors | \
+     SubGhzProtocolFilter_Princeton | SubGhzProtocolFilter_NiceFlorS)
 
 SubGhzLastSettings* subghz_last_settings_alloc(void) {
     SubGhzLastSettings* instance = malloc(sizeof(SubGhzLastSettings));
