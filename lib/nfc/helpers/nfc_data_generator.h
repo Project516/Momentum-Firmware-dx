@@ -12,6 +12,8 @@ typedef enum {
     NfcDataGeneratorTypeMfUltralightEV1_H11,
     NfcDataGeneratorTypeMfUltralightEV1_21,
     NfcDataGeneratorTypeMfUltralightEV1_H21,
+    NfcDataGeneratorTypeMfUltralightC,
+    NfcDataGeneratorTypeMfUltralightAES,
     NfcDataGeneratorTypeNTAG203,
     NfcDataGeneratorTypeNTAG213,
     NfcDataGeneratorTypeNTAG215,
@@ -26,6 +28,31 @@ typedef enum {
     NfcDataGeneratorTypeMfClassic1k_7b,
     NfcDataGeneratorTypeMfClassic4k_4b,
     NfcDataGeneratorTypeMfClassic4k_7b,
+
+    NfcDataGeneratorTypeMfPlusSE_4b,
+    NfcDataGeneratorTypeMfPlusSE_7b,
+    NfcDataGeneratorTypeMfPlusS2k_4b,
+    NfcDataGeneratorTypeMfPlusS2k_7b,
+    NfcDataGeneratorTypeMfPlusS4k_4b,
+    NfcDataGeneratorTypeMfPlusS4k_7b,
+    NfcDataGeneratorTypeMfPlusX2k_4b,
+    NfcDataGeneratorTypeMfPlusX2k_7b,
+    NfcDataGeneratorTypeMfPlusX4k_4b,
+    NfcDataGeneratorTypeMfPlusX4k_7b,
+    NfcDataGeneratorTypeMfPlusEV1_2k_4b,
+    NfcDataGeneratorTypeMfPlusEV1_2k_7b,
+    NfcDataGeneratorTypeMfPlusEV1_4k_4b,
+    NfcDataGeneratorTypeMfPlusEV1_4k_7b,
+    NfcDataGeneratorTypeMfPlusEV2_2k_4b,
+    NfcDataGeneratorTypeMfPlusEV2_2k_7b,
+    NfcDataGeneratorTypeMfPlusEV2_4k_4b,
+    NfcDataGeneratorTypeMfPlusEV2_4k_7b,
+
+    // No TK15: it is a TK13 frame whose timings are too ragged for absolute thresholds, so there
+    // is no such thing as a TK15 to generate - a clean waveform always reads back as TK13.
+    NfcDataGeneratorTypeTexkomTk13,
+    NfcDataGeneratorTypeTexkomTk17,
+    NfcDataGeneratorTypeTexkomMmbit,
 
     NfcDataGeneratorTypeNum,
 

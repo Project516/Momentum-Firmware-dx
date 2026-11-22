@@ -2,7 +2,6 @@
 
 #include <furi.h>
 #include <input/input.h>
-#include <notification/notification_messages.h>
 #include <gui/elements.h>
 #include "../helpers/subghz_frequency_analyzer_worker.h"
 
@@ -41,6 +40,9 @@ struct SubGhzFrequencyAnalyzer {
 
 typedef struct {
     uint32_t frequency;
+    /** Last frequency seen above the trigger. Unlike frequency it is not cleared when the
+     * signal drops, so OK still has something to act on once the remote is released. */
+    uint32_t frequency_last;
     uint32_t frequency_to_save;
     float rssi;
     uint32_t history_frequency[MAX_HISTORY];
@@ -52,7 +54,6 @@ typedef struct {
     uint8_t selected_index;
     uint8_t max_index;
     bool show_frame;
-    bool is_ext_radio;
 } SubGhzFrequencyAnalyzerModel;
 
 void subghz_frequency_analyzer_set_callback(
@@ -160,7 +161,6 @@ void subghz_frequency_analyzer_draw(Canvas* canvas, SubGhzFrequencyAnalyzerModel
     canvas_set_color(canvas, ColorBlack);
     canvas_set_font(canvas, FontSecondary);
 
-    //canvas_draw_str(canvas, 0, 7, model->is_ext_radio ? "Ext" : "Int");
     canvas_draw_str(canvas, 20, 7, "Frequency Analyzer");
 
     // RSSI
@@ -275,6 +275,13 @@ bool subghz_frequency_analyzer_input(InputEvent* event, void* context) {
                     (!model->show_frame && model->signal)) {
                     frequency_candidate = subghz_frequency_analyzer_get_nearest_frequency(
                         instance->worker, model->frequency);
+                }
+
+                /* Neither boxed nor in the history yet still leaves the last reading worth
+                 * acting on, so OK works without having to keep the remote held down. */
+                if(frequency_candidate == 0 && model->frequency_last != 0) {
+                    frequency_candidate = subghz_frequency_analyzer_get_nearest_frequency(
+                        instance->worker, model->frequency_last);
                 }
 
                 frequency_candidate = frequency_candidate == 0 ||
@@ -432,6 +439,9 @@ void subghz_frequency_analyzer_pair_callback(
             model->rssi = rssi;
             model->rssi_last = instance->rssi_last;
             model->frequency = frequency;
+            if(frequency != 0) {
+                model->frequency_last = frequency;
+            }
             model->signal = signal;
             model->trigger = subghz_frequency_analyzer_worker_get_trigger_level(instance->worker);
             model->feedback_level = instance->feedback_level;
@@ -472,6 +482,7 @@ void subghz_frequency_analyzer_enter(void* context) {
             model->rssi = 0;
             model->rssi_last = 0;
             model->frequency = 0;
+            model->frequency_last = 0;
             model->history_frequency[3] = 0;
             model->history_frequency[2] = 0;
             model->history_frequency[1] = 0;
@@ -482,8 +493,6 @@ void subghz_frequency_analyzer_enter(void* context) {
             model->history_frequency_rx_count[0] = 0;
             model->frequency_to_save = 0;
             model->trigger = RSSI_MIN;
-            model->is_ext_radio =
-                (subghz_txrx_radio_device_get(instance->txrx) != SubGhzRadioDeviceTypeInternal);
         },
         true);
 }
@@ -497,8 +506,6 @@ void subghz_frequency_analyzer_exit(void* context) {
         subghz_frequency_analyzer_worker_stop(instance->worker);
     }
     subghz_frequency_analyzer_worker_free(instance->worker);
-
-    furi_record_close(RECORD_NOTIFICATION);
 }
 
 SubGhzFrequencyAnalyzer* subghz_frequency_analyzer_alloc(SubGhzTxRx* txrx) {

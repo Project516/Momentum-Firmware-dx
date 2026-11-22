@@ -8,6 +8,8 @@
 
 #include "protocol_group_misc_defs.h"
 
+#include "../../ibutton_write_targets.h"
+
 #define IBUTTON_MISC_READ_TIMEOUT 100
 
 #define IBUTTON_MISC_DATA_KEY_KEY_COMMON "Data"
@@ -57,7 +59,11 @@ static uint32_t ibutton_protocol_group_misc_get_features(
     UNUSED(group);
     furi_assert(id < iButtonProtocolMiscMax);
 
-    return ibutton_protocols_misc[id]->write_id ? iButtonProtocolFeatureWriteId : 0;
+    // A protocol that names blanks but cannot write them must not advertise the feature:
+    // the writing screen trusts this bit and calls write_id.
+    const iButtonProtocolMiscBase* protocol = ibutton_protocols_misc[id];
+    const bool writable = protocol->write_targets && protocol->write_id;
+    return writable ? iButtonProtocolFeatureWriteId : 0;
 }
 
 static const char* ibutton_protocol_group_misc_get_manufacturer(
@@ -147,26 +153,54 @@ static bool ibutton_protocol_group_misc_read(
     return result;
 }
 
+static iButtonWriteTargetMask ibutton_protocol_group_misc_get_write_targets(
+    iButtonProtocolGroupMisc* group,
+    iButtonProtocolLocalId id) {
+    UNUSED(group);
+    furi_assert(id < iButtonProtocolMiscMax);
+
+    return ibutton_protocols_misc[id]->write_targets;
+}
+
 static bool ibutton_protocol_group_misc_write_id(
     iButtonProtocolGroupMisc* group,
     iButtonProtocolData* data,
-    iButtonProtocolLocalId id) {
+    iButtonProtocolLocalId id,
+    const iButtonWriteTargetContext* write_ctx) {
     furi_assert(id < iButtonProtocolMiscMax);
 
     const iButtonProtocolMiscBase* protocol = ibutton_protocols_misc[id];
+    furi_assert(protocol->write_targets);
     furi_check(protocol->write_id);
 
+    // Nothing to try: return before touching the bus rather than starting it, waiting out
+    // the settle and looping over an empty mask.
+    const iButtonWriteTargetMask mask = protocol->write_targets & write_ctx->mask;
+    if(!mask) return false;
+
+    // Before the bus is started, so a key the protocol refuses costs neither the settle
+    // below nor a moment of driving the line.
+    if(protocol->is_writable && !protocol->is_writable(data)) return false;
+
     OneWireHost* host = group->host;
+    bool success = false;
 
     onewire_host_start(host);
     furi_delay_ms(100);
 
-    FURI_CRITICAL_ENTER();
+    for(iButtonWriteTarget target = 0; target < iButtonWriteTargetMax && !success; target++) {
+        if(!(mask & IBUTTON_WRITE_TARGET_BIT(target))) continue;
 
-    const bool success = protocol->write_id(host, data);
+        // Announced outside the critical section, which masks the scheduler: the callback
+        // may block to let a listener repaint before the attempt starts.
+        if(write_ctx->target_cb) write_ctx->target_cb(target, write_ctx->context);
+
+        FURI_CRITICAL_ENTER();
+        success = protocol->write_id(host, target, data);
+        FURI_CRITICAL_EXIT();
+    }
+
     onewire_host_stop(host);
-
-    FURI_CRITICAL_EXIT();
 
     return success;
 }
@@ -326,7 +360,9 @@ const iButtonProtocolGroupBase ibutton_protocol_group_misc = {
     .get_name = (iButtonProtocolGroupGetStringFunc)ibutton_protocol_group_misc_get_name,
 
     .read = (iButtonProtocolGroupReadFunc)ibutton_protocol_group_misc_read,
-    .write_id = (iButtonProtocolGroupWriteFunc)ibutton_protocol_group_misc_write_id,
+    .get_write_targets =
+        (iButtonProtocolGroupGetTargetsFunc)ibutton_protocol_group_misc_get_write_targets,
+    .write_id = (iButtonProtocolGroupWriteIdFunc)ibutton_protocol_group_misc_write_id,
     .write_copy = NULL,
 
     .emulate_start = (iButtonProtocolGroupApplyFunc)ibutton_protocol_group_misc_emulate_start,

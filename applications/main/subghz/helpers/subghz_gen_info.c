@@ -1,5 +1,5 @@
-#include "subghz_gen_info.h"
-#include "../helpers/subghz_txrx_create_protocol_key.h"
+#include <subghz/helpers/subghz_gen_info.h>
+#include "subghz_txrx_create_protocol_key.h"
 #include <lib/subghz/protocols/protocol_items.h>
 #include <lib/subghz/blocks/math.h>
 
@@ -19,7 +19,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
     subghz_txrx_gen_key_marantec(&marantec_key);
 
     switch(type) {
-    case SetTypePricenton433:
+    case SetTypePricenton:
         gen_info = (GenInfo){
             .type = GenData,
             .mod = "AM650",
@@ -27,19 +27,25 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.name = SUBGHZ_PROTOCOL_PRINCETON_NAME,
             .data.key = (key & 0x00FFFFF0) | 0x4, // btn 0x1, 0x2, 0x4, 0x8
             .data.bits = 24,
-            .data.te = 400};
+            .data.te = 400,
+            .data.te_min = 109,
+            .data.te_max = 689,
+            .data.gt = 30,
+            .data.gt_min = 15,
+            .data.gt_max = 72};
         break;
-    case SetTypePricenton315:
+    case SetTypeTelcomaEdge:
         gen_info = (GenInfo){
             .type = GenData,
             .mod = "AM650",
-            .freq = 315000000,
-            .data.name = SUBGHZ_PROTOCOL_PRINCETON_NAME,
-            .data.key = (key & 0x00FFFFF0) | 0x4, // btn 0x1, 0x2, 0x4, 0x8
-            .data.bits = 24,
-            .data.te = 400};
+            .freq = 433920000,
+            .data.name = SUBGHZ_PROTOCOL_TELCOMA_EDGE_NAME,
+            // 0xFF preamble + serial; one-hot channel in low 3 bits
+            // (gate = 0, others 0x1 / 0x2 / 0x4)
+            .data.key = 0xFF000000 | (key & 0x00FFFFF8),
+            .data.bits = 32};
         break;
-    case SetTypeZKTeco430:
+    case SetTypeZKTeco:
         gen_info = (GenInfo){
             .type = GenData,
             .mod = "AM650",
@@ -47,7 +53,12 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.name = SUBGHZ_PROTOCOL_PRINCETON_NAME,
             .data.key = (key & 0x00FFFF00) | 0x30, // btn 0x30(UP), 0x03(STOP), 0x0C(DOWN)
             .data.bits = 24,
-            .data.te = 357};
+            .data.te = 357,
+            .data.te_min = 109,
+            .data.te_max = 689,
+            .data.gt = 30,
+            .data.gt_min = 15,
+            .data.gt_max = 72};
         break;
     case SetTypeNiceFlo12bit:
         gen_info = (GenInfo){
@@ -69,6 +80,18 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 24,
             .data.te = 0};
         break;
+    case SetTypeFaacTm:
+        gen_info = (GenInfo){
+            .type = GenData,
+            .mod = "AM650",
+            .freq = 433920000,
+            .data.name = SUBGHZ_PROTOCOL_FAAC_TM_NAME,
+            .data.key = (key & 0xFFF), // 12 dip switches, no button field
+            .data.bits = 12,
+            .data.te = 400,
+            .data.te_min = 101,
+            .data.te_max = 999};
+        break;
     case SetTypeCAME12bit:
         gen_info = (GenInfo){
             .type = GenData,
@@ -89,27 +112,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 24,
             .data.te = 0};
         break;
-    case SetTypeCAME12bit868:
-        gen_info = (GenInfo){
-            .type = GenData,
-            .mod = "AM650",
-            .freq = 868350000,
-            .data.name = SUBGHZ_PROTOCOL_CAME_NAME,
-            .data.key = (key & 0x00000FF0) | 0x1, // btn 0x1, 0x2, 0x4
-            .data.bits = 12,
-            .data.te = 0};
-        break;
-    case SetTypeCAME24bit868:
-        gen_info = (GenInfo){
-            .type = GenData,
-            .mod = "AM650",
-            .freq = 868350000,
-            .data.name = SUBGHZ_PROTOCOL_CAME_NAME,
-            .data.key = (key & 0x00FFFFF0) | 0x4, // btn 0x1, 0x2, 0x4, 0x8
-            .data.bits = 24,
-            .data.te = 0};
-        break;
-    case SetTypeRoger_433:
+    case SetTypeRoger:
         gen_info = (GenInfo){
             .type = GenData,
             .mod = "AM650",
@@ -119,7 +122,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 28,
             .data.te = 0};
         break;
-    case SetTypeLinear_300_00:
+    case SetTypeLinear:
         gen_info = (GenInfo){
             .type = GenData,
             .mod = "AM650",
@@ -129,7 +132,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 10,
             .data.te = 0};
         break;
-    case SetTypeBETT_433:
+    case SetTypeBETT:
         gen_info = (GenInfo){
             .type = GenData,
             .mod = "AM650",
@@ -159,7 +162,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 24,
             .data.te = 0};
         break;
-    case SetTypeGangQi_433:
+    case SetTypeGangQi:
         gen_info = (GenInfo){
             .type = GenData,
             .mod = "AM650",
@@ -169,7 +172,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 34,
             .data.te = 0};
         break;
-    case SetTypeHollarm_433:
+    case SetTypeHollarm:
         gen_info = (GenInfo){
             .type = GenData,
             .mod = "AM650",
@@ -184,7 +187,19 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 42,
             .data.te = 0};
         break;
-    case SetTypeReversRB2_433:
+    case SetTypeNordIce:
+        gen_info = (GenInfo){
+            .type = GenData,
+            .mod = "AM650",
+            .freq = 433920000,
+            // Button 4 of 0x4, 0x8, 0x1, 0x2 at bits 12..9, plus bit 13 which is set on
+            // every frame; bit 14 stays clear, the encoder sets it on one frame of the pair
+            .data.name = SUBGHZ_PROTOCOL_NORD_ICE_NAME,
+            .data.key = (key & 0x1FFFF81FF) | 0x2400,
+            .data.bits = 33,
+            .data.te = 0};
+        break;
+    case SetTypeReversRB2:
         gen_info = (GenInfo){
             .type = GenData,
             .mod = "AM650",
@@ -194,7 +209,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 64,
             .data.te = 0};
         break;
-    case SetTypeMarantec24_868:
+    case SetTypeMarantec24:
         gen_info = (GenInfo){
             .type = GenData,
             .mod = "AM650",
@@ -204,7 +219,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 24,
             .data.te = 0};
         break;
-    case SetTypeMarantec_433:
+    case SetTypeMarantec:
         gen_info = (GenInfo){
             .type = GenData,
             .mod = "AM650",
@@ -215,18 +230,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .data.bits = 49,
             .data.te = 0};
         break;
-    case SetTypeMarantec_868:
-        gen_info = (GenInfo){
-            .type = GenData,
-            .mod = "AM650",
-            .freq = 868350000,
-            .data.name =
-                SUBGHZ_PROTOCOL_MARANTEC_NAME, // Button code is 0x4 and crc sum to the end
-            .data.key = marantec_key,
-            .data.bits = 49,
-            .data.te = 0};
-        break;
-    case SetTypeFaacSLH_433:
+    case SetTypeFaacSLH:
         gen_info = (GenInfo){
             .type = GenFaacSLH,
             .mod = "AM650",
@@ -237,18 +241,19 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .faac_slh.seed = (uint32_t)key,
             .faac_slh.manuf = "FAAC_SLH"};
         break;
-    case SetTypeFaacSLH_868:
+    case SetTypeGenius:
+        // Genius shares the Faac SLH frame and differs only in the manufacture key
         gen_info = (GenInfo){
             .type = GenFaacSLH,
             .mod = "AM650",
-            .freq = 868350000,
+            .freq = 433920000,
             .faac_slh.serial = ((key & 0x00FFFFF0) | 0xA0000006) >> 4,
             .faac_slh.btn = 0x06,
             .faac_slh.cnt = 0x02,
             .faac_slh.seed = (uint32_t)key,
-            .faac_slh.manuf = "FAAC_SLH"};
+            .faac_slh.manuf = "Genius"};
         break;
-    case SetTypeBeninca433:
+    case SetTypeBeninca:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -258,17 +263,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x05,
             .keeloq.manuf = "Beninca"};
         break;
-    case SetTypeBeninca868:
-        gen_info = (GenInfo){
-            .type = GenKeeloq,
-            .mod = "AM650",
-            .freq = 868350000,
-            .keeloq.serial = (key & 0x000FFF00) | 0x00800080,
-            .keeloq.btn = 0x01,
-            .keeloq.cnt = 0x05,
-            .keeloq.manuf = "Beninca"};
-        break;
-    case SetTypeComunello433:
+    case SetTypeComunello:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -278,17 +273,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x05,
             .keeloq.manuf = "Comunello"};
         break;
-    case SetTypeComunello868:
-        gen_info = (GenInfo){
-            .type = GenKeeloq,
-            .mod = "AM650",
-            .freq = 868460000,
-            .keeloq.serial = key & 0x00FFFFFF,
-            .keeloq.btn = 0x08,
-            .keeloq.cnt = 0x05,
-            .keeloq.manuf = "Comunello"};
-        break;
-    case SetTypeAllmatic433:
+    case SetTypeAllmatic:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -298,17 +283,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x05,
             .keeloq.manuf = "Beninca"};
         break;
-    case SetTypeAllmatic868:
-        gen_info = (GenInfo){
-            .type = GenKeeloq,
-            .mod = "AM650",
-            .freq = 868350000,
-            .keeloq.serial = (key & 0x00FFFF00) | 0x01000011,
-            .keeloq.btn = 0x0C,
-            .keeloq.cnt = 0x05,
-            .keeloq.manuf = "Beninca"};
-        break;
-    case SetTypeCenturion433:
+    case SetTypeCenturion:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -318,17 +293,43 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Centurion"};
         break;
-    case SetTypeMonarch433:
+    case SetTypeMonarch:
+        // Seed carries the discriminator, which differs per remote - 0x100 and 0x280 are the
+        // values seen so far. Advanced Add Manually asks for it, the quick path keeps 0x100
+        gen_info = (GenInfo){
+            .type = GenKeeloqSeed,
+            .mod = "AM650",
+            .freq = 433920000,
+            .keeloq_seed.serial = (key & 0x0000FFFF),
+            .keeloq_seed.btn = 0x0A,
+            .keeloq_seed.cnt = 0x03,
+            .keeloq_seed.seed = 0x100,
+            .keeloq_seed.manuf = "Monarch"};
+        break;
+    case SetTypePhantomHiland:
+        // Seed carries the 12 bit discriminator: serial & 0x3FF in the low 10 bits, the top
+        // 2 differing per remote. Advanced Add Manually asks for it, the quick path clears it
+        gen_info = (GenInfo){
+            .type = GenKeeloqSeed,
+            .mod = "AM650",
+            .freq = 433920000,
+            .keeloq_seed.serial = (key & 0x0FFFFFFF),
+            .keeloq_seed.btn = 0x02,
+            .keeloq_seed.cnt = 0x03,
+            .keeloq_seed.seed = (key & 0x3FF),
+            .keeloq_seed.manuf = "Phantom_Hiland"};
+        break;
+    case SetTypeKEY:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
             .freq = 433920000,
-            .keeloq.serial = (key & 0x0000FFFF),
-            .keeloq.btn = 0x0A,
+            .keeloq.serial = (key & 0x0FFFFFFF),
+            .keeloq.btn = 0x01,
             .keeloq.cnt = 0x03,
-            .keeloq.manuf = "Monarch"};
+            .keeloq.manuf = "KEY"};
         break;
-    case SetTypeJollyMotors433:
+    case SetTypeJollyMotors:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -368,7 +369,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Aprimatic"};
         break;
-    case SetTypeGibidi433:
+    case SetTypeGibidi:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -387,6 +388,16 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.btn = 0x02,
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "GSN"};
+        break;
+    case SetTypeHomeGate:
+        gen_info = (GenInfo){
+            .type = GenKeeloq,
+            .mod = "AM650",
+            .freq = 433920000,
+            .keeloq.serial = key & 0x0FFFFFFF,
+            .keeloq.btn = 0x02,
+            .keeloq.cnt = 0x03,
+            .keeloq.manuf = "HomeGate"};
         break;
     case SetTypeIronLogic:
         gen_info = (GenInfo){
@@ -418,7 +429,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Stilmatic"};
         break;
-    case SetTypeSommer_FM_434:
+    case SetTypeSommer_FM476:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "FM476",
@@ -428,17 +439,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Sommer"};
         break;
-    case SetTypeSommer_FM_868:
-        gen_info = (GenInfo){
-            .type = GenKeeloq,
-            .mod = "FM476",
-            .freq = 868800000,
-            .keeloq.serial = (key & 0x0000FFFF) | 0x01700000,
-            .keeloq.btn = 0x02,
-            .keeloq.cnt = 0x03,
-            .keeloq.manuf = "Sommer"};
-        break;
-    case SetTypeSommer_FM12K_434:
+    case SetTypeSommer:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "FM12K",
@@ -448,17 +449,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Sommer"};
         break;
-    case SetTypeSommer_FM12K_868:
-        gen_info = (GenInfo){
-            .type = GenKeeloq,
-            .mod = "FM12K",
-            .freq = 868800000,
-            .keeloq.serial = key & 0x0000FFFF,
-            .keeloq.btn = 0x02,
-            .keeloq.cnt = 0x03,
-            .keeloq.manuf = "Sommer"};
-        break;
-    case SetTypeDTMNeo433:
+    case SetTypeDTMNeo:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -478,19 +469,11 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Came_Space"};
         break;
-    case SetTypeCameAtomo433:
+    case SetTypeCameAtomo:
         gen_info = (GenInfo){
             .type = GenCameAtomo,
             .mod = "AM650",
             .freq = 433920000,
-            .came_atomo.serial = (key & 0x0FFFFFFF) | 0x10000000,
-            .came_atomo.cnt = 0x03};
-        break;
-    case SetTypeCameAtomo868:
-        gen_info = (GenInfo){
-            .type = GenCameAtomo,
-            .mod = "AM650",
-            .freq = 868350000,
             .came_atomo.serial = (key & 0x0FFFFFFF) | 0x10000000,
             .came_atomo.cnt = 0x03};
         break;
@@ -505,7 +488,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq_seed.seed = key & 0x000FFFFF,
             .keeloq_seed.manuf = "BFT"};
         break;
-    case SetTypeErreka433:
+    case SetTypeErreka:
         gen_info = (GenInfo){
             .type = GenKeeloqSeed,
             .mod = "AM650",
@@ -561,6 +544,21 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .beninca_arc.btn = 0x02,
             .beninca_arc.cnt = 0x03};
         break;
+    case SetTypeBelKorn:
+        gen_info = (GenInfo){
+            .type = GenBelKorn,
+            .mod = "AM650",
+            .freq = 433920000,
+            // 36 bit serial, big endian; rand() only fills 31 bits so the top one is seeded too
+            .belkorn.serial =
+                {(uint8_t)((key >> 32) & 0x0F),
+                 (uint8_t)(key >> 24),
+                 (uint8_t)(key >> 16),
+                 (uint8_t)(key >> 8),
+                 (uint8_t)key},
+            .belkorn.btn = 0x01, // one-hot: 0x01, 0x02, 0x04, 0x20
+            .belkorn.cnt = 0x05};
+        break;
     case SetTypeJarolift:
         gen_info = (GenInfo){
             .type = GenJarolift,
@@ -579,7 +577,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .ditec_gol4.btn = 0x01,
             .ditec_gol4.cnt = 0xC200};
         break;
-    case SetTypeMotorline433:
+    case SetTypeMotorline:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -589,7 +587,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Motorline"};
         break;
-    case SetTypeDoorHan_433_92:
+    case SetTypeDoorHan:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -599,17 +597,17 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "DoorHan"};
         break;
-    case SetTypeDoorHan_315_00:
+    case SetTypeSuperrollo:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
-            .freq = 315000000,
+            .freq = 433920000,
             .keeloq.serial = key & 0x0FFFFFFF,
-            .keeloq.btn = 0x02,
+            .keeloq.btn = 0x0A,
             .keeloq.cnt = 0x03,
-            .keeloq.manuf = "DoorHan"};
+            .keeloq.manuf = "Superrollo"};
         break;
-    case SetTypeNiceFlorS_433_92:
+    case SetTypeNiceFlorS:
         gen_info = (GenInfo){
             .type = GenNiceFlorS,
             .mod = "AM650",
@@ -619,7 +617,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .nice_flor_s.cnt = 0x03,
             .nice_flor_s.nice_one = false};
         break;
-    case SetTypeNiceOne_433_92:
+    case SetTypeNiceOne:
         gen_info = (GenInfo){
             .type = GenNiceFlorS,
             .mod = "AM650",
@@ -629,7 +627,49 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .nice_flor_s.cnt = 0x03,
             .nice_flor_s.nice_one = true};
         break;
-    case SetTypeNiceSmilo_433_92:
+    case SetTypeNiceOCode:
+        gen_info = (GenInfo){
+            .type = GenNiceFlorS,
+            .mod = "AM650",
+            .freq = 433920000,
+            .nice_flor_s.serial = key & 0x0FFFFFFF,
+            .nice_flor_s.btn = 0x01,
+            // not 0x03 like the entries above: a receiver refuses a count far behind the
+            // remotes it already holds, which an O-Code remote has to clear to enrol itself
+            .nice_flor_s.cnt = 0xC089,
+            // a made up installer code makes a remote of its own system; to join a gate
+            // that is already installed, enter its code under Add Manually -> Advanced
+            .nice_flor_s.ic = (uint16_t)rand(),
+            .nice_flor_s.o_code = true};
+        break;
+    case SetTypeNiceOCodeOne:
+        gen_info = (GenInfo){
+            .type = GenNiceFlorS,
+            .mod = "AM650",
+            .freq = 433920000,
+            .nice_flor_s.serial = key & 0x0FFFFFFF,
+            .nice_flor_s.btn = 0x01,
+            .nice_flor_s.cnt = 0xC089,
+            .nice_flor_s.ic = (uint16_t)rand(),
+            .nice_flor_s.o_code = true,
+            .nice_flor_s.nice_one = true};
+        break;
+    case SetTypeNiceOCodeCert:
+        /* Same remote, plus the receiver certificate it enrols itself with. Both the
+         * installer code and the certificate have to be the gate's own, so this one
+         * always walks the full chain and asks. */
+        gen_info = (GenInfo){
+            .type = GenNiceFlorS,
+            .mod = "AM650",
+            .freq = 433920000,
+            .nice_flor_s.serial = key & 0x0FFFFFFF,
+            .nice_flor_s.btn = 0x01,
+            .nice_flor_s.cnt = 0xC089,
+            .nice_flor_s.cert_wanted = true,
+            .nice_flor_s.o_code = true,
+            .nice_flor_s.nice_one = true};
+        break;
+    case SetTypeNiceSmilo:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -639,7 +679,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "NICE_Smilo"};
         break;
-    case SetTypeNiceMHouse_433_92:
+    case SetTypeNiceMHouse:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -649,17 +689,21 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "NICE_MHOUSE"};
         break;
-    case SetTypeDeaMio433:
+    case SetTypeDeaMio:
+        // Seed carries the 12 bit discriminator: serial & 0x3FF in the low 10 bits, the two OVR
+        // bits above them. Advanced Add Manually asks for it so an original remote's bits can be
+        // entered; the quick path sets both, as the remotes this was built from send
         gen_info = (GenInfo){
-            .type = GenKeeloq,
+            .type = GenKeeloqSeed,
             .mod = "AM650",
             .freq = 433920000,
-            .keeloq.serial = (key & 0x0FFFF000) | 0x00000869,
-            .keeloq.btn = 0x02,
-            .keeloq.cnt = 0x03,
-            .keeloq.manuf = "Dea_Mio"};
+            .keeloq_seed.serial = (key & 0x0FFFF000) | 0x00000869,
+            .keeloq_seed.btn = 0x02,
+            .keeloq_seed.cnt = 0x03,
+            .keeloq_seed.seed = 0xC69,
+            .keeloq_seed.manuf = "Dea_Mio"};
         break;
-    case SetTypeGeniusBravo433:
+    case SetTypeGeniusBravo:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -669,7 +713,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Genius_Bravo"};
         break;
-    case SetTypeJCM_433_92:
+    case SetTypeJCM:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -679,7 +723,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "JCM_Tech"};
         break;
-    case SetTypeNovoferm_433_92:
+    case SetTypeNovoferm:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -689,7 +733,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Novoferm"};
         break;
-    case SetTypeHormannEcoStar_433_92:
+    case SetTypeHormannEcoStar:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -699,7 +743,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "EcoStar"};
         break;
-    case SetTypeCardinS449_433FM:
+    case SetTypeCardinS449FM:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "FM12K",
@@ -709,7 +753,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Cardin_S449"};
         break;
-    case SetTypePujol433:
+    case SetTypePujol:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -719,7 +763,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Pujol"};
         break;
-    case SetTypeET_Blue433:
+    case SetTypeET_Blue:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -729,7 +773,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "ET_Blue"};
         break;
-    case SetTypeET_Blue_Mix433:
+    case SetTypeET_Blue_Mix:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -739,7 +783,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "ET_Blue_Mix"};
         break;
-    case SetTypeATA_PTX4_433:
+    case SetTypeATA_PTX4:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -749,7 +793,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "ATA_PTX4"};
         break;
-    case SetTypePujol_Vario433:
+    case SetTypePujol_Vario:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -759,7 +803,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Pujol_Vario"};
         break;
-    case SetTypeSeav433:
+    case SetTypeSeav:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -769,7 +813,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Seav"};
         break;
-    case SetTypeWisniowski433:
+    case SetTypeWisniowski:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -779,7 +823,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Wisniowski"};
         break;
-    case SetTypeFadini433:
+    case SetTypeFadini:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -789,7 +833,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Fadini"};
         break;
-    case SetTypeMc_Garcia433:
+    case SetTypeMc_Garcia:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -799,7 +843,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Mc_Garcia"};
         break;
-    case SetTypeClemsa_Mutancode433:
+    case SetTypeClemsa_Mutancode:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -809,7 +853,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Clemsa_Mutancode"};
         break;
-    case SetTypeDoormatic433:
+    case SetTypeDoormatic:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -819,7 +863,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Doormatic"};
         break;
-    case SetTypeElvox433:
+    case SetTypeElvox:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -829,7 +873,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Elvox"};
         break;
-    case SetTypeVerex433:
+    case SetTypeVerex:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -839,7 +883,19 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Verex"};
         break;
-    case SetTypeFAACRCXT_433_92:
+    case SetTypeFaacFix:
+        // Seed carries the 12 bit discriminator: serial & 0x3FF below both OVR bits, set
+        gen_info = (GenInfo){
+            .type = GenKeeloqSeed,
+            .mod = "AM650",
+            .freq = 433920000,
+            .keeloq_seed.serial = (key & 0x0FFFFFFF),
+            .keeloq_seed.btn = 0x02,
+            .keeloq_seed.cnt = 0x03,
+            .keeloq_seed.seed = (key & 0x3FF) | 0xC00,
+            .keeloq_seed.manuf = "FAAC_FIX"};
+        break;
+    case SetTypeFAACRCXT:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -849,17 +905,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "FAAC_RC,XT"};
         break;
-    case SetTypeFAACRCXT_868:
-        gen_info = (GenInfo){
-            .type = GenKeeloq,
-            .mod = "AM650",
-            .freq = 868350000,
-            .keeloq.serial = (key & 0x0000FFFF) | 0x00100000,
-            .keeloq.btn = 0x02,
-            .keeloq.cnt = 0x03,
-            .keeloq.manuf = "FAAC_RC,XT"};
-        break;
-    case SetTypeNormstahl_433_92:
+    case SetTypeNormstahl:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -869,7 +915,7 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "Normstahl"};
         break;
-    case SetTypeHCS101_433_92:
+    case SetTypeHCS101:
         gen_info = (GenInfo){
             .type = GenKeeloq,
             .mod = "AM650",
@@ -879,43 +925,10 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .keeloq.cnt = 0x03,
             .keeloq.manuf = "HCS101"};
         break;
-    case SetTypeSecPlus_v1_315_00:
-        gen_info = (GenInfo){.type = GenSecPlus1, .mod = "AM650", .freq = 315000000};
-        break;
-    case SetTypeSecPlus_v1_390_00:
-        gen_info = (GenInfo){.type = GenSecPlus1, .mod = "AM650", .freq = 390000000};
-        break;
-    case SetTypeSecPlus_v1_433_00:
+    case SetTypeSecPlus_v1:
         gen_info = (GenInfo){.type = GenSecPlus1, .mod = "AM650", .freq = 433920000};
         break;
-    case SetTypeSecPlus_v2_310_00:
-        gen_info = (GenInfo){
-            .type = GenSecPlus2,
-            .mod = "AM650",
-            .freq = 310000000,
-            .sec_plus_2.serial = (key & 0x7FFFF3FC), // 850LM pairing
-            .sec_plus_2.btn = 0x68,
-            .sec_plus_2.cnt = 0xE500000};
-        break;
-    case SetTypeSecPlus_v2_315_00:
-        gen_info = (GenInfo){
-            .type = GenSecPlus2,
-            .mod = "AM650",
-            .freq = 315000000,
-            .sec_plus_2.serial = (key & 0x7FFFF3FC), // 850LM pairing
-            .sec_plus_2.btn = 0x68,
-            .sec_plus_2.cnt = 0xE500000};
-        break;
-    case SetTypeSecPlus_v2_390_00:
-        gen_info = (GenInfo){
-            .type = GenSecPlus2,
-            .mod = "AM650",
-            .freq = 390000000,
-            .sec_plus_2.serial = (key & 0x7FFFF3FC), // 850LM pairing
-            .sec_plus_2.btn = 0x68,
-            .sec_plus_2.cnt = 0xE500000};
-        break;
-    case SetTypeSecPlus_v2_433_00:
+    case SetTypeSecPlus_v2:
         gen_info = (GenInfo){
             .type = GenSecPlus2,
             .mod = "AM650",
@@ -924,13 +937,33 @@ void subghz_scene_set_type_fill_generation_infos(GenInfo* infos_dest, SetType ty
             .sec_plus_2.btn = 0x68,
             .sec_plus_2.cnt = 0xE500000};
         break;
-    case SetTypePhoenix_V2_433:
+    case SetTypePhoenix_V2:
         gen_info = (GenInfo){
             .type = GenPhoenixV2,
             .mod = "AM650",
             .freq = 433920000,
             .phoenix_v2.serial = (key & 0x0FFFFFFF) | 0xB0000000,
             .phoenix_v2.cnt = 0x025D};
+        break;
+    case SetTypeProteco:
+        gen_info = (GenInfo){
+            .type = GenData,
+            .mod = "AM650",
+            .freq = 433920000,
+            .data.name = SUBGHZ_PROTOCOL_PROTECO_NAME,
+            // TX3: low 2 bits are the button, A (gate) = 0x2, B = 0x0, C = 0x1
+            .data.key = (key & 0x00FFFFFC) | 0x2,
+            .data.bits = 24};
+        break;
+    case SetTypePrastel:
+        gen_info = (GenInfo){
+            .type = GenPrastel,
+            .mod = "AM650",
+            .freq = 433920000,
+            // the frame only carries 21 bits of the serial
+            .prastel.serial = key & SUBGHZ_PROTOCOL_PRASTEL_SERIAL_MASK,
+            .prastel.btn = 0x01,
+            .prastel.cnt = 0x03};
         break;
     default:
         furi_crash("Not implemented");

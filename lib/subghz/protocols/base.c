@@ -86,11 +86,23 @@ uint32_t subghz_protocol_decoder_base_get_hash_data_long(SubGhzProtocolDecoderBa
     uint32_t hash = 0;
     if(!decoder_base->protocol || !decoder_base->protocol->decoder) return hash;
 
-    if(decoder_base->protocol->decoder->get_hash_data) {
-        hash = decoder_base->protocol->decoder->get_hash_data(decoder_base);
-    } else if(decoder_base->protocol->decoder->get_hash_data_long) {
+    if(decoder_base->protocol->decoder->get_hash_data_long) {
         hash = decoder_base->protocol->decoder->get_hash_data_long(decoder_base);
+    } else if(decoder_base->protocol->decoder->get_hash_data) {
+        hash = decoder_base->protocol->decoder->get_hash_data(decoder_base);
     }
 
     return hash;
+}
+
+SubGhzProtocolType subghz_protocol_decoder_base_get_type(SubGhzProtocolDecoderBase* decoder_base) {
+    furi_check(decoder_base);
+
+    if(decoder_base->protocol == NULL) return SubGhzProtocolTypeUnknown;
+
+    if(decoder_base->protocol->decoder && decoder_base->protocol->decoder->get_type) {
+        return decoder_base->protocol->decoder->get_type(decoder_base);
+    }
+
+    return decoder_base->protocol->type;
 }

@@ -7,6 +7,7 @@
 
 #include <ibutton/ibutton_key.h>
 #include <ibutton/ibutton_worker.h>
+#include <ibutton/ibutton_settings.h>
 #include <ibutton/ibutton_protocols.h>
 
 #include <notification/notification_messages.h>
@@ -157,6 +158,7 @@ void ibutton_cli_write(PipeSide* pipe, FuriString* args) {
         ibutton_cli_print_key(protocols, key);
         printf("Press Ctrl+C to abort\r\n");
 
+        ibutton_worker_set_write_targets(worker, ibutton_settings_get_write_targets());
         ibutton_worker_write_id_start(worker, key);
         while(true) {
             uint32_t flags = furi_event_flag_wait(
@@ -176,6 +178,11 @@ void ibutton_cli_write(PipeSide* pipe, FuriString* args) {
                         furi_string_get_cstr(reason));
                     furi_string_free(reason);
                     notification_message(notification, &sequence_error);
+                    break;
+                } else if(write_context.result == iButtonWorkerWriteNoEnabledTarget) {
+                    // The setting can only be changed on the device, so name the screen.
+                    printf("Every blank that can write it is disabled in iButton -> Settings "
+                           "-> Write Blanks.\r\n");
                     break;
                 }
             }

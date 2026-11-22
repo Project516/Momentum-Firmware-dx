@@ -48,6 +48,9 @@ static const uint8_t keyboard_origin_y = 29;
 static const uint8_t keyboard_row_count = 3;
 static const uint8_t keyboard_count = 2;
 
+// Beyond anything the 120 px text line can show on either side of the cursor
+#define TEXT_INPUT_LINE_CHARS_MAX 127
+
 #define ENTER_KEY           '\r'
 #define BACKSPACE_KEY       '\b'
 #define SWITCH_KEYBOARD_KEY '\t'
@@ -280,7 +283,8 @@ static void text_input_backspace_cb(TextInputModel* model) {
 
 static void text_input_view_draw_callback(Canvas* canvas, void* _model) {
     TextInputModel* model = _model;
-    uint8_t text_length = model->text_buffer ? strlen(model->text_buffer) : 0;
+    const char* text = model->text_buffer ? model->text_buffer : "";
+    size_t text_length = strlen(text);
     uint8_t needed_string_width = canvas_width(canvas) - 8;
     uint8_t start_pos = 4;
 
@@ -293,11 +297,15 @@ static void text_input_view_draw_callback(Canvas* canvas, void* _model) {
     canvas_draw_str(canvas, 2, 8, model->header);
     elements_slightly_rounded_frame(canvas, 1, 12, 126, 15);
 
-    char buf[text_length + 1];
-    if(model->text_buffer) {
-        strlcpy(buf, model->text_buffer, sizeof(buf));
-    }
+    // Only the window around the cursor is copied, the rest could never reach the line.
+    // Room for the cursor mark and "..." is added on top of the text and its terminator.
+    const size_t before = MIN(cursor_pos, (size_t)TEXT_INPUT_LINE_CHARS_MAX);
+    const size_t after = MIN(text_length - cursor_pos, (size_t)TEXT_INPUT_LINE_CHARS_MAX);
+    char buf[before + after + 1 + 3 + 1];
+    memcpy(buf, text + cursor_pos - before, before + after);
+    buf[before + after] = '\0';
     char* str = buf;
+    cursor_pos = before;
 
     if(model->clear_default_text) {
         elements_slightly_rounded_box(

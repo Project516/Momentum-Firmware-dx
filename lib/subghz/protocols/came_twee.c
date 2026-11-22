@@ -6,6 +6,7 @@
 #include "../blocks/encoder.h"
 #include "../blocks/generic.h"
 #include "../blocks/math.h"
+#include "common.h"
 
 /*
  * Help
@@ -21,6 +22,19 @@
         (dip & 0x0040 ? '1' : '0'), (dip & 0x0020 ? '1' : '0'), (dip & 0x0010 ? '1' : '0'), \
         (dip & 0x0008 ? '1' : '0'), (dip & 0x0004 ? '1' : '0'), (dip & 0x0002 ? '1' : '0'), \
         (dip & 0x0001 ? '1' : '0')
+
+/**
+ * Top 22 bits of every Came Twee frame, carried by all 15 parcels listed on
+ * subghz_protocol_came_twee_remote_controller and by every frame of every capture to hand.
+ *
+ * Checked before a 54 bit frame is reported. Without it the only test is the bit count, and
+ * te_delta is half of te_short here, so a wide enough Manchester-ish signal from another
+ * protocol lands on 54 bits now and then and is announced as a Came Twee remote - BelGate did
+ * exactly that, 129 times across four captures.
+ */
+#define CAME_TWEE_FRAME_PREFIX      0x3FFF72UL
+#define CAME_TWEE_FRAME_PREFIX_MASK 0x3FFFFFUL
+#define CAME_TWEE_FRAME_PREFIX_SH   32
 
 /** 
  * Rainbow table Came Twee.
@@ -57,6 +71,7 @@ struct SubGhzProtocolDecoderCameTwee {
     SubGhzBlockGeneric generic;
     ManchesterState manchester_saved_state;
 };
+SUBGHZ_ASSERT_DECODER_COMMON_LAYOUT(SubGhzProtocolDecoderCameTwee);
 
 struct SubGhzProtocolEncoderCameTwee {
     SubGhzProtocolEncoderBase base;
@@ -64,6 +79,7 @@ struct SubGhzProtocolEncoderCameTwee {
     SubGhzProtocolBlockEncoder encoder;
     SubGhzBlockGeneric generic;
 };
+SUBGHZ_ASSERT_ENCODER_GENERIC_LAYOUT(SubGhzProtocolEncoderCameTwee);
 
 typedef enum {
     CameTweeDecoderStepReset = 0,
@@ -72,26 +88,25 @@ typedef enum {
 
 const SubGhzProtocolDecoder subghz_protocol_came_twee_decoder = {
     .alloc = subghz_protocol_decoder_came_twee_alloc,
-    .free = subghz_protocol_decoder_came_twee_free,
+    .free = subghz_protocol_decoder_common_free,
 
     .feed = subghz_protocol_decoder_came_twee_feed,
     .reset = subghz_protocol_decoder_came_twee_reset,
 
-    .get_hash_data = NULL,
-    .get_hash_data_long = subghz_protocol_decoder_came_twee_get_hash_data,
-    .serialize = subghz_protocol_decoder_came_twee_serialize,
+    .get_hash_data = subghz_protocol_decoder_common_get_hash_data,
+    .get_hash_data_long = subghz_protocol_decoder_common_get_hash_data_long,
+    .serialize = subghz_protocol_decoder_common_serialize,
     .deserialize = subghz_protocol_decoder_came_twee_deserialize,
     .get_string = subghz_protocol_decoder_came_twee_get_string,
-    .get_string_brief = NULL,
 };
 
 const SubGhzProtocolEncoder subghz_protocol_came_twee_encoder = {
     .alloc = subghz_protocol_encoder_came_twee_alloc,
-    .free = subghz_protocol_encoder_came_twee_free,
+    .free = subghz_protocol_encoder_common_free,
 
     .deserialize = subghz_protocol_encoder_came_twee_deserialize,
     .stop = subghz_protocol_encoder_came_twee_stop,
-    .yield = subghz_protocol_encoder_came_twee_yield,
+    .yield = subghz_protocol_encoder_common_yield,
 };
 
 const SubGhzProtocol subghz_protocol_came_twee = {
@@ -106,23 +121,8 @@ const SubGhzProtocol subghz_protocol_came_twee = {
 
 void* subghz_protocol_encoder_came_twee_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    SubGhzProtocolEncoderCameTwee* instance = malloc(sizeof(SubGhzProtocolEncoderCameTwee));
-
-    instance->base.protocol = &subghz_protocol_came_twee;
-    instance->generic.protocol_name = instance->base.protocol->name;
-
-    instance->encoder.repeat = 1;
-    instance->encoder.size_upload = 1536; // 1308
-    instance->encoder.upload = malloc(instance->encoder.size_upload * sizeof(LevelDuration));
-    instance->encoder.is_running = false;
-    return instance;
-}
-
-void subghz_protocol_encoder_came_twee_free(void* context) {
-    furi_assert(context);
-    SubGhzProtocolEncoderCameTwee* instance = context;
-    free(instance->encoder.upload);
-    free(instance);
+    return subghz_protocol_encoder_common_alloc(
+        sizeof(SubGhzProtocolEncoderCameTwee), &subghz_protocol_came_twee, 1, 1536); // 1308
 }
 
 static LevelDuration
@@ -234,6 +234,13 @@ static void subghz_protocol_came_twee_remote_controller(SubGhzBlockGeneric* inst
     uint8_t cnt_parcel = (uint8_t)(instance->data & 0xF);
     uint32_t data = (uint32_t)(instance->data & 0x0FFFFFFFF);
 
+    // The parcel counter only ever runs 0xE..0x0, so the rainbow table has 15 entries.
+    // A noisy 54 bit frame or a hand-edited key can still carry 0xF here - clamp to
+    // stay inside the table instead of reading past its end.
+    if(cnt_parcel >= COUNT_OF(came_twee_magic_numbers_xor)) {
+        cnt_parcel = COUNT_OF(came_twee_magic_numbers_xor) - 1;
+    }
+
     data = (data ^ came_twee_magic_numbers_xor[cnt_parcel]);
     instance->serial = data;
     data /= 4;
@@ -275,36 +282,10 @@ void subghz_protocol_encoder_came_twee_stop(void* context) {
     instance->encoder.front = 0; // reset position
 }
 
-LevelDuration subghz_protocol_encoder_came_twee_yield(void* context) {
-    SubGhzProtocolEncoderCameTwee* instance = context;
-
-    if(instance->encoder.repeat == 0 || !instance->encoder.is_running) {
-        instance->encoder.is_running = false;
-        return level_duration_reset();
-    }
-
-    LevelDuration ret = instance->encoder.upload[instance->encoder.front];
-
-    if(++instance->encoder.front == instance->encoder.size_upload) {
-        if(!subghz_block_generic_global.endless_tx) instance->encoder.repeat--;
-        instance->encoder.front = 0;
-    }
-
-    return ret;
-}
-
 void* subghz_protocol_decoder_came_twee_alloc(SubGhzEnvironment* environment) {
     UNUSED(environment);
-    SubGhzProtocolDecoderCameTwee* instance = malloc(sizeof(SubGhzProtocolDecoderCameTwee));
-    instance->base.protocol = &subghz_protocol_came_twee;
-    instance->generic.protocol_name = instance->base.protocol->name;
-    return instance;
-}
-
-void subghz_protocol_decoder_came_twee_free(void* context) {
-    furi_assert(context);
-    SubGhzProtocolDecoderCameTwee* instance = context;
-    free(instance);
+    return subghz_protocol_decoder_common_alloc(
+        sizeof(SubGhzProtocolDecoderCameTwee), &subghz_protocol_came_twee);
 }
 
 void subghz_protocol_decoder_came_twee_reset(void* context) {
@@ -363,8 +344,10 @@ void subghz_protocol_decoder_came_twee_feed(void* context, bool level, uint32_t 
             } else if(
                 duration >= ((uint32_t)subghz_protocol_came_twee_const.te_long * 2 +
                              subghz_protocol_came_twee_const.te_delta)) {
-                if(instance->decoder.decode_count_bit ==
-                   subghz_protocol_came_twee_const.min_count_bit_for_found) {
+                if((instance->decoder.decode_count_bit ==
+                    subghz_protocol_came_twee_const.min_count_bit_for_found) &&
+                   (((instance->decoder.decode_data >> CAME_TWEE_FRAME_PREFIX_SH) &
+                     CAME_TWEE_FRAME_PREFIX_MASK) == CAME_TWEE_FRAME_PREFIX)) {
                     instance->generic.data = instance->decoder.decode_data;
                     instance->generic.data_count_bit = instance->decoder.decode_count_bit;
 
@@ -415,22 +398,6 @@ void subghz_protocol_decoder_came_twee_feed(void* context, bool level, uint32_t 
         }
         break;
     }
-}
-
-uint32_t subghz_protocol_decoder_came_twee_get_hash_data(void* context) {
-    furi_assert(context);
-    SubGhzProtocolDecoderCameTwee* instance = context;
-    return subghz_protocol_blocks_get_hash_data_long(
-        &instance->decoder, (instance->decoder.decode_count_bit / 8) + 1);
-}
-
-SubGhzProtocolStatus subghz_protocol_decoder_came_twee_serialize(
-    void* context,
-    FlipperFormat* flipper_format,
-    SubGhzRadioPreset* preset) {
-    furi_assert(context);
-    SubGhzProtocolDecoderCameTwee* instance = context;
-    return subghz_block_generic_serialize(&instance->generic, flipper_format, preset);
 }
 
 SubGhzProtocolStatus

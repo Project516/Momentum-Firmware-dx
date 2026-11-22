@@ -182,6 +182,12 @@ bool subghz_scene_save_name_on_event(void* context, SceneManagerEvent event) {
 void subghz_scene_save_name_on_exit(void* context) {
     SubGhz* subghz = context;
 
+    // Whoever generated a signal into txrx raised this before pushing the scene; every way out of
+    // here abandons or consumes that signal, and the empty-name popup unwinds to the start scene
+    // rather than coming back, so the flag cannot be left for the next save to pick up.
+    scene_manager_set_scene_state(
+        subghz->scene_manager, SubGhzSceneSaveName, SubGhzCustomEventManagerNoSet);
+
     // Clear validator
     void* validator_context = text_input_get_validator_callback_context(subghz->text_input);
     text_input_set_validator(subghz->text_input, NULL, NULL);

@@ -16,6 +16,18 @@
  * Then, register the plugin in the `application.fam` file in the `nfc` directory. Use the existing
  * entries as an example. After being registered, the plugin will be automatically deployed with the application.
  *
+ * @note a card that is not yours is not an error: log the checks that decline a card at
+ * FURI_LOG_D, since every plugin of a protocol runs against every card of that protocol.
+ *
+ * @note for Mifare Classic, knowing a sector's keys does not mean its blocks were read - the
+ * two are tracked separately, and an unread block is zero-filled. Prefer rejecting a value
+ * that the card cannot hold, which also catches a corrupt block; reach for
+ * mf_classic_parser_block_has_data() when zero is a legal value. Note that
+ * mf_classic_is_block_read() alone reads false for every block of a pre-v2 dump.
+ *
+ * @note parsed_data is empty when parse() is called, so a plugin may build its output before
+ * deciding the card is not its own. Its contents mean nothing unless parse() returns true.
+ *
  * @note the APPID field MUST end with `_parser` so the applicaton would know that this particular file
  * is a supported card plugin.
  *
@@ -37,6 +49,14 @@
  * @brief Currently supported plugin API version.
  */
 #define NFC_SUPPORTED_CARD_PLUGIN_API_VERSION 1
+
+/**
+ * @brief Filename suffix of a deployed supported card plugin.
+ *
+ * Follows from the APPID rule noted above: the appid ends with `_parser`, and a plugin is
+ * deployed as `<appid>.fal`.
+ */
+#define NFC_SUPPORTED_CARDS_PLUGIN_SUFFIX "_parser.fal"
 
 /**
  * @brief Verify that the card is of a supported type.

@@ -4,7 +4,7 @@
 
 MU_TEST(test_dialog_file_browser_set_basic_options_should_init_all_fields) {
     mu_assert(
-        sizeof(DialogsFileBrowserOptions) == 28,
+        sizeof(DialogsFileBrowserOptions) == 32,
         "Changes to `DialogsFileBrowserOptions` should also be reflected in `dialog_file_browser_set_basic_options`");
 
     DialogsFileBrowserOptions options;
@@ -19,6 +19,7 @@ MU_TEST(test_dialog_file_browser_set_basic_options_should_init_all_fields) {
     mu_assert(options.hide_ext, "`hide_ext` should default to `true");
     mu_assert_null(options.item_loader_callback);
     mu_assert_null(options.item_loader_context);
+    mu_assert(!options.select_right, "`select_right` should default to `false");
 }
 
 MU_TEST_SUITE(dialogs_file_browser_options) {

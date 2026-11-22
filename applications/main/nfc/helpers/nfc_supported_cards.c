@@ -12,8 +12,7 @@
 
 #define TAG "NfcSupportedCards"
 
-#define NFC_SUPPORTED_CARDS_PLUGINS_PATH  APP_DATA_PATH("plugins")
-#define NFC_SUPPORTED_CARDS_PLUGIN_SUFFIX "_parser.fal"
+#define NFC_SUPPORTED_CARDS_PLUGINS_PATH APP_DATA_PATH("plugins")
 
 typedef enum {
     NfcSupportedCardsPluginFeatureHasVerify = (1U << 0),
@@ -287,6 +286,8 @@ bool nfc_supported_cards_parse(
             if(plugin == NULL) continue;
 
             if(plugin->parse) {
+                // a plugin may write before it decides the card is not its own, so start clean
+                furi_string_reset(parsed_data);
                 if(plugin->parse(device, parsed_data)) {
                     card_parsed = true;
                     break;

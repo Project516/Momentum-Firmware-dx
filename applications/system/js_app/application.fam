@@ -8,7 +8,6 @@ App(
     fap_libs=["assets"],
     entry_point="js_app",
     stack_size=2 * 1024,
-    resources="examples",
     order=10,
     sources=[
         "js_app.c",
@@ -18,8 +17,8 @@ App(
         "plugin_api/app_api_table.cpp",
         "views/console_view.c",
         "modules/js_flipper.c",
-        "modules/js_tests.c",
     ],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -35,9 +34,9 @@ App(
         "js_value.c",
         "plugin_api/app_api_table.cpp",
         "modules/js_flipper.c",
-        "modules/js_tests.c",
     ],
     fap_libs=["assets"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -49,6 +48,7 @@ App(
         "modules/js_event_loop/js_event_loop.c",
         "modules/js_event_loop/js_event_loop_api_table.cpp",
     ],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -57,6 +57,7 @@ App(
     entry_point="js_gui_ep",
     requires=["js_app"],
     sources=["modules/js_gui/js_gui.c", "modules/js_gui/js_gui_api_table.cpp"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -65,6 +66,7 @@ App(
     entry_point="js_view_loading_ep",
     requires=["js_app"],
     sources=["modules/js_gui/loading.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -73,6 +75,7 @@ App(
     entry_point="js_view_empty_screen_ep",
     requires=["js_app"],
     sources=["modules/js_gui/empty_screen.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -81,6 +84,7 @@ App(
     entry_point="js_view_submenu_ep",
     requires=["js_app"],
     sources=["modules/js_gui/submenu.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -89,6 +93,7 @@ App(
     entry_point="js_view_text_input_ep",
     requires=["js_app"],
     sources=["modules/js_gui/text_input.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -97,6 +102,7 @@ App(
     entry_point="js_view_number_input_ep",
     requires=["js_app"],
     sources=["modules/js_gui/number_input.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -105,6 +111,7 @@ App(
     entry_point="js_view_button_panel_ep",
     requires=["js_app"],
     sources=["modules/js_gui/button_panel.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -113,6 +120,7 @@ App(
     entry_point="js_view_popup_ep",
     requires=["js_app"],
     sources=["modules/js_gui/popup.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -121,6 +129,7 @@ App(
     entry_point="js_view_button_menu_ep",
     requires=["js_app"],
     sources=["modules/js_gui/button_menu.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -129,6 +138,7 @@ App(
     entry_point="js_view_menu_ep",
     requires=["js_app"],
     sources=["modules/js_gui/menu.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -137,6 +147,7 @@ App(
     entry_point="js_view_vi_list_ep",
     requires=["js_app"],
     sources=["modules/js_gui/vi_list.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -145,6 +156,7 @@ App(
     entry_point="js_view_byte_input_ep",
     requires=["js_app"],
     sources=["modules/js_gui/byte_input.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -153,6 +165,7 @@ App(
     entry_point="js_view_text_box_ep",
     requires=["js_app"],
     sources=["modules/js_gui/text_box.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -161,6 +174,7 @@ App(
     entry_point="js_view_dialog_ep",
     requires=["js_app"],
     sources=["modules/js_gui/dialog.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -170,6 +184,7 @@ App(
     requires=["js_app"],
     sources=["modules/js_gui/file_picker.c"],
     fap_libs=[],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -178,6 +193,7 @@ App(
     entry_point="js_view_widget_ep",
     requires=["js_app"],
     sources=["modules/js_gui/widget.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -187,6 +203,7 @@ App(
     requires=["js_app"],
     sources=["modules/js_gui/icon.c"],
     fap_libs=["assets"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -195,6 +212,7 @@ App(
     entry_point="js_notification_ep",
     requires=["js_app"],
     sources=["modules/js_notification.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -203,6 +221,7 @@ App(
     entry_point="js_badusb_ep",
     requires=["js_app"],
     sources=["modules/js_badusb.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -211,6 +230,7 @@ App(
     entry_point="js_serial_ep",
     requires=["js_app"],
     sources=["modules/js_serial.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -219,6 +239,7 @@ App(
     entry_point="js_gpio_ep",
     requires=["js_app"],
     sources=["modules/js_gpio.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -227,6 +248,7 @@ App(
     entry_point="js_math_ep",
     requires=["js_app"],
     sources=["modules/js_math.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -235,6 +257,7 @@ App(
     entry_point="js_storage_ep",
     requires=["js_app"],
     sources=["modules/js_storage.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -243,6 +266,7 @@ App(
     entry_point="js_vgm_ep",
     requires=["js_app"],
     sources=["modules/js_vgm/*.c", "modules/js_vgm/ICM42688P/*.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -251,6 +275,7 @@ App(
     entry_point="js_subghz_ep",
     requires=["js_app"],
     sources=["modules/js_subghz/*.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -259,6 +284,7 @@ App(
     entry_point="js_infrared_ep",
     requires=["js_app"],
     sources=["modules/js_infrared/*.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -267,6 +293,7 @@ App(
     entry_point="js_blebeacon_ep",
     requires=["js_app"],
     sources=["modules/js_blebeacon.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -275,6 +302,7 @@ App(
     entry_point="js_usbdisk_ep",
     requires=["js_app"],
     sources=["modules/js_usbdisk/*.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -283,6 +311,7 @@ App(
     entry_point="js_i2c_ep",
     requires=["js_app"],
     sources=["modules/js_i2c.c"],
+    fap_exclude_libs=["gcc"],
 )
 
 App(
@@ -291,4 +320,5 @@ App(
     entry_point="js_spi_ep",
     requires=["js_app"],
     sources=["modules/js_spi.c"],
+    fap_exclude_libs=["gcc"],
 )

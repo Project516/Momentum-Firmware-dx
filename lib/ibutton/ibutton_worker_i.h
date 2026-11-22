@@ -41,6 +41,10 @@ struct iButtonWorker {
     iButtonWorkerWriteCallback write_cb;
     iButtonWorkerEmulateCallback emulate_cb;
 
+    iButtonWriteTargetMask write_target_mask;
+    // iButtonWriteTargetMax until a target is attempted; the name is derived, not copied.
+    iButtonWriteTarget write_target;
+
     void* cb_ctx;
 };
 
@@ -48,6 +52,9 @@ extern const iButtonWorkerModeType ibutton_worker_modes[];
 
 void ibutton_worker_switch_mode(iButtonWorker* worker, iButtonWorkerMode mode);
 void ibutton_worker_notify_emulate(iButtonWorker* worker);
+
+/** Hand a write result to the callback, if one is set. */
+void ibutton_worker_write_report(iButtonWorker* worker, iButtonWorkerWriteResult result);
 
 #ifdef __cplusplus
 }

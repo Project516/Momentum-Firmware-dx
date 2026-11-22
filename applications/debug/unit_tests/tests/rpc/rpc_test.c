@@ -1406,7 +1406,7 @@ static void test_rpc_storage_rename_run(
 }
 
 MU_TEST(test_storage_rename) {
-    test_rpc_storage_rename_run("", "", ++command_id, PB_CommandStatus_ERROR_STORAGE_INVALID_NAME);
+    test_rpc_storage_rename_run("", "", ++command_id, PB_CommandStatus_ERROR_STORAGE_NOT_EXIST);
 
     furi_check(!test_is_exists(TEST_DIR "empty.txt"));
     test_create_file(TEST_DIR "empty.txt", 0);

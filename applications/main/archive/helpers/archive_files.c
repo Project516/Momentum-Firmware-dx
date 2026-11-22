@@ -156,6 +156,11 @@ FS_Error archive_copy_rename_file_or_dir(
         error = FSE_INVALID_NAME;
     } else if(!copy && !strcmp(src_path, furi_string_get_cstr(dst_path))) {
         error = FSE_EXIST;
+    } else if(
+        !copy &&
+        storage_common_equivalent_path(fs_api, src_path, furi_string_get_cstr(dst_path))) {
+        // Same entry under a different spelling (case-only rename), not a name collision
+        error = storage_common_rename(fs_api, src_path, furi_string_get_cstr(dst_path));
     } else {
         if(find_name && storage_common_exists(fs_api, furi_string_get_cstr(dst_path))) {
             FuriString* dir_path = furi_string_alloc();
