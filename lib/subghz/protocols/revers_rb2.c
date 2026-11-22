@@ -190,14 +190,12 @@ void subghz_protocol_decoder_revers_rb2_reset(void* context) {
 void subghz_protocol_decoder_revers_rb2_addbit(void* context, bool data) {
     SubGhzProtocolDecoderRevers_RB2* instance = context;
     instance->decoder.decode_data = (instance->decoder.decode_data << 1) | data;
-    instance->decoder.decode_count_bit++;
 
-    if(instance->decoder.decode_count_bit >= 65) {
-        instance->decoder.decode_data = 0;
-        instance->decoder.decode_count_bit = 0;
-        return;
+    // Frames repeat back to back, so test every bit offset instead of fixed windows
+    if(instance->decoder.decode_count_bit <
+       subghz_protocol_revers_rb2_const.min_count_bit_for_found) {
+        instance->decoder.decode_count_bit++;
     }
-
     if(instance->decoder.decode_count_bit <
        subghz_protocol_revers_rb2_const.min_count_bit_for_found) {
         return;
