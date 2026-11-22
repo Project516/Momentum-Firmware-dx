@@ -1,5 +1,5 @@
 entry,status,name,type,params
-Version,+,88.5,,
+Version,+,88.6,,
 Header,+,applications/drivers/subghz/cc1101_ext/cc1101_ext_interconnect.h,,
 Header,+,applications/main/archive/helpers/archive_helpers_ext.h,,
 Header,+,applications/services/applications.h,,
@@ -10,7 +10,6 @@ Header,+,applications/services/cli/cli_vcp.h,,
 Header,+,applications/services/dialogs/dialogs.h,,
 Header,+,applications/services/dolphin/dolphin.h,,
 Header,+,applications/services/expansion/expansion.h,,
-Header,+,applications/services/expansion/expansion_settings.h,,
 Header,+,applications/services/gui/elements.h,,
 Header,+,applications/services/gui/gui.h,,
 Header,+,applications/services/gui/icon_i.h,,
@@ -939,7 +938,6 @@ Function,+,canvas_draw_xbm_ex,void,"Canvas*, int32_t, int32_t, size_t, size_t, I
 Function,+,canvas_get_buffer,uint8_t*,Canvas*
 Function,+,canvas_get_buffer_size,size_t,const Canvas*
 Function,+,canvas_get_font_params,const CanvasFontParameters*,"const Canvas*, Font"
-Function,+,canvas_get_orientation,CanvasOrientation,const Canvas*
 Function,+,canvas_glyph_width,size_t,"Canvas*, uint16_t"
 Function,+,canvas_height,size_t,const Canvas*
 Function,+,canvas_invert_color,void,Canvas*
@@ -949,7 +947,6 @@ Function,+,canvas_set_color,void,"Canvas*, Color"
 Function,+,canvas_set_custom_u8g2_font,void,"Canvas*, const uint8_t*"
 Function,+,canvas_set_font,void,"Canvas*, Font"
 Function,+,canvas_set_font_direction,void,"Canvas*, CanvasDirection"
-Function,+,canvas_set_orientation,void,"Canvas*, CanvasOrientation"
 Function,+,canvas_string_width,uint16_t,"Canvas*, const char*"
 Function,+,canvas_width,size_t,const Canvas*
 Function,-,cbrt,double,double
@@ -1246,7 +1243,6 @@ Function,+,file_browser_worker_load,void,"BrowserWorker*, uint32_t, uint32_t"
 Function,+,file_browser_worker_set_callback_context,void,"BrowserWorker*, void*"
 Function,+,file_browser_worker_set_config,void,"BrowserWorker*, FuriString*, const char*, _Bool, _Bool"
 Function,+,file_browser_worker_set_folder_callback,void,"BrowserWorker*, BrowserWorkerFolderOpenCallback"
-Function,+,file_browser_worker_set_folder_error_callback,void,"BrowserWorker*, BrowserWorkerFolderErrorCallback"
 Function,+,file_browser_worker_set_item_callback,void,"BrowserWorker*, BrowserWorkerListItemCallback"
 Function,+,file_browser_worker_set_list_callback,void,"BrowserWorker*, BrowserWorkerListLoadCallback"
 Function,+,file_browser_worker_set_long_load_callback,void,"BrowserWorker*, BrowserWorkerLongLoadCallback"
@@ -2145,14 +2141,14 @@ Function,+,hex_char_to_hex_nibble,_Bool,"char, uint8_t*"
 Function,+,hex_char_to_uint8,_Bool,"char, char, uint8_t*"
 Function,+,hex_chars_to_uint64,_Bool,"const char*, uint64_t*"
 Function,+,hex_chars_to_uint8,_Bool,"const char*, uint8_t*"
-Function,+,hsv2rgb,void,"const HsvColor*, RgbColor*"
-Function,+,hsvcmp,int,"const HsvColor*, const HsvColor*"
 Function,+,hitagmicro_variant_name,const char*,HitagMicroVariant
 Function,+,hitagmicro_variant_password,const uint8_t*,HitagMicroVariant
 Function,+,hitagmicro_write,void,"const LFRFIDHitagMicro*, const uint8_t*"
 Function,-,hitags_read_uid,_Bool,"uint8_t*, HitagSAbortCallback, void*"
 Function,-,hitags_selftest,const char*,
 Function,-,hitags_write,void,"const LFRFIDHitagS*, const uint8_t*"
+Function,+,hsv2rgb,void,"const HsvColor*, RgbColor*"
+Function,+,hsvcmp,int,"const HsvColor*, const HsvColor*"
 Function,-,hypot,double,"double, double"
 Function,-,hypotf,float,"float, float"
 Function,-,hypotl,long double,"long double, long double"
@@ -2529,7 +2525,6 @@ Function,+,loader_get_application_name,_Bool,"Loader*, FuriString*"
 Function,+,loader_get_pubsub,FuriPubSub*,Loader*
 Function,+,loader_is_locked,_Bool,Loader*
 Function,+,loader_lock,_Bool,Loader*
-Function,+,loader_set_menu_style,void,"Loader*, const char*"
 Function,+,loader_show_menu,void,Loader*
 Function,+,loader_show_settings,void,Loader*
 Function,+,loader_signal,_Bool,"Loader*, uint32_t, void*"
@@ -2540,9 +2535,6 @@ Function,+,loader_unlock,void,Loader*
 Function,+,loading_alloc,Loading*,
 Function,+,loading_free,void,Loading*
 Function,+,loading_get_view,View*,Loading*
-Function,+,loading_reset_progress,void,Loading*
-Function,+,loading_set_progress,void,"Loading*, float"
-Function,+,loading_set_text,void,"Loading*, const char*"
 Function,+,locale_celsius_to_fahrenheit,float,float
 Function,+,locale_fahrenheit_to_celsius,float,float
 Function,+,locale_format_date,void,"FuriString*, const DateTime*, const LocaleDateFormat, const char*"
@@ -2809,7 +2801,6 @@ Function,+,menu_get_selected_item,uint32_t,Menu*
 Function,+,menu_get_view,View*,Menu*
 Function,+,menu_reset,void,Menu*
 Function,+,menu_set_selected_item,void,"Menu*, uint32_t"
-Function,+,menu_set_style,void,"Menu*, const MenuStyle*"
 Function,+,mf_classic_alloc,MfClassicData*,
 Function,+,mf_classic_block_to_value,_Bool,"const MfClassicBlock*, int32_t*, uint8_t*"
 Function,+,mf_classic_copy,void,"MfClassicData*, const MfClassicData*"
@@ -4127,7 +4118,6 @@ Function,+,view_dispatcher_set_custom_event_callback,void,"ViewDispatcher*, View
 Function,+,view_dispatcher_set_event_callback_context,void,"ViewDispatcher*, void*"
 Function,+,view_dispatcher_set_navigation_event_callback,void,"ViewDispatcher*, ViewDispatcherNavigationEventCallback"
 Function,+,view_dispatcher_set_tick_event_callback,void,"ViewDispatcher*, ViewDispatcherTickEventCallback, uint32_t"
-Function,+,view_dispatcher_show_loading,void,ViewDispatcher*
 Function,+,view_dispatcher_stop,void,ViewDispatcher*
 Function,+,view_dispatcher_switch_to_view,void,"ViewDispatcher*, uint32_t"
 Function,+,view_free,void,View*
@@ -4469,6 +4459,7 @@ Variable,+,I_passport_okay_46x49,const Icon,
 Variable,+,I_pause_19x20,const Icon,
 Variable,+,I_pause_hover_19x20,const Icon,
 Variable,+,I_pause_text_23x5,const Icon,
+Variable,+,I_phone_10px,const Icon,
 Variable,+,I_play_19x20,const Icon,
 Variable,+,I_play_hover_19x20,const Icon,
 Variable,+,I_play_text_19x5,const Icon,
@@ -4499,6 +4490,7 @@ Variable,+,I_subrem_10px,const Icon,
 Variable,+,I_subtitle_19x20,const Icon,
 Variable,+,I_subtitle_hover_19x20,const Icon,
 Variable,+,I_subtitle_text_19x5,const Icon,
+Variable,+,I_t5577_10px,const Icon,
 Variable,+,I_timer_19x20,const Icon,
 Variable,+,I_timer_hover_19x20,const Icon,
 Variable,+,I_timer_text_23x5,const Icon,
