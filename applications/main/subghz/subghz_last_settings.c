@@ -27,9 +27,10 @@
 #define SUBGHZ_LAST_SETTING_FIELD_TX_POWER          "TXPower"
 
 // Flags the receiver config can ignore; extend when adding a new "Ignore ..." option
-#define SUBGHZ_LAST_SETTING_IGNORE_FILTER_MASK                                               \
-    (SubGhzProtocolFilter_ReversRB2 | SubGhzProtocolFilter_Alarms | SubGhzProtocolFilter_Sensors | \
-     SubGhzProtocolFilter_Princeton | SubGhzProtocolFilter_NiceFlorS)
+#define SUBGHZ_LAST_SETTING_IGNORE_FILTER_MASK                       \
+    (SubGhzProtocolFilter_ReversRB2 | SubGhzProtocolFilter_Alarms |  \
+     SubGhzProtocolFilter_Sensors | SubGhzProtocolFilter_Princeton | \
+     SubGhzProtocolFilter_NiceFlorS)
 
 SubGhzLastSettings* subghz_last_settings_alloc(void) {
     SubGhzLastSettings* instance = malloc(sizeof(SubGhzLastSettings));

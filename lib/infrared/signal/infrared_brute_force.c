@@ -160,7 +160,8 @@ InfraredErrorCode infrared_brute_force_calculate_messages_ex(
                 if(!auto_detect_buttons) {
                     // A database holds names the caller never asked for; those are not ours to collect
                     if(!ignore_unknown_buttons) {
-                        FURI_LOG_W(TAG, "Unknown signal name: %s", furi_string_get_cstr(signal_name));
+                        FURI_LOG_W(
+                            TAG, "Unknown signal name: %s", furi_string_get_cstr(signal_name));
                     }
                     continue;
                 }

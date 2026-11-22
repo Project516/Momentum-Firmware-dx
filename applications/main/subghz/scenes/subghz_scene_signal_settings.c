@@ -374,4 +374,3 @@ void subghz_scene_signal_settings_on_exit(void* context) {
     byte_input_set_header_text(subghz->byte_input, "");
     furi_string_free(byte_input_text);
 }
-

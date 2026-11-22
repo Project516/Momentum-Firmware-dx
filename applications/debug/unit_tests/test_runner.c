@@ -230,11 +230,8 @@ static bool test_runner_print_report(
     return passed;
 }
 
-static void test_runner_show_result(
-    TestRunner* instance,
-    bool passed,
-    uint32_t elapsed,
-    uint32_t leaked) {
+static void
+    test_runner_show_result(TestRunner* instance, bool passed, uint32_t elapsed, uint32_t leaked) {
     char text[80];
     snprintf(
         text,
