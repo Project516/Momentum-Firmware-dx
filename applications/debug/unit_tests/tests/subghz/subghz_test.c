@@ -812,34 +812,6 @@ MU_TEST(subghz_decoder_hay21_test) {
         "Test decoder " SUBGHZ_PROTOCOL_HAY21_NAME " error\r\n");
 }
 
-MU_TEST(subghz_decoder_solight_te44_test) {
-    mu_assert(
-        subghz_decoder_test(
-            EXT_PATH("unit_tests/subghz/solight_te44_raw.sub"), WS_PROTOCOL_SOLIGHT_TE44_NAME),
-        "Test decoder " WS_PROTOCOL_SOLIGHT_TE44_NAME " error\r\n");
-}
-
-MU_TEST(subghz_decoder_bresser_3ch_v1_test) {
-    mu_assert(
-        subghz_decoder_test(
-            EXT_PATH("unit_tests/subghz/bresser_3ch_raw.sub"), WS_PROTOCOL_BRESSER_3CH_NAME),
-        "Test decoder " WS_PROTOCOL_BRESSER_3CH_NAME " v1 error\r\n");
-}
-
-MU_TEST(subghz_decoder_bresser_3ch_v0_test) {
-    mu_assert(
-        subghz_decoder_test(
-            EXT_PATH("unit_tests/subghz/bresser_3ch_v0_raw.sub"), WS_PROTOCOL_BRESSER_3CH_NAME),
-        "Test decoder " WS_PROTOCOL_BRESSER_3CH_NAME " v0 error\r\n");
-}
-
-MU_TEST(subghz_decoder_vauno_en8822c_test) {
-    mu_assert(
-        subghz_decoder_test(
-            EXT_PATH("unit_tests/subghz/vauno_en8822c.sub"), WS_PROTOCOL_VAUNO_EN8822C_NAME),
-        "Test decoder " WS_PROTOCOL_VAUNO_EN8822C_NAME " error\r\n");
-}
-
 MU_TEST(subghz_decoder_elplast_test) {
     mu_assert(
         subghz_decoder_test(
@@ -1158,10 +1130,6 @@ MU_TEST_SUITE(subghz) {
     MU_RUN_TEST(subghz_decoder_feron_test);
     MU_RUN_TEST(subghz_decoder_legrand_test);
     MU_RUN_TEST(subghz_decoder_marantec24_test);
-    // MU_RUN_TEST(subghz_decoder_solight_te44_test);
-    // MU_RUN_TEST(subghz_decoder_bresser_3ch_v1_test);
-    // MU_RUN_TEST(subghz_decoder_bresser_3ch_v0_test);
-    // MU_RUN_TEST(subghz_decoder_vauno_en8822c_test);
     MU_RUN_TEST(subghz_decoder_freezer_test);
     MU_RUN_TEST(subghz_decoder_elplast_test);
 
