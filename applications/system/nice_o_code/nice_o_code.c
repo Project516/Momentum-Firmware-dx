@@ -24,6 +24,7 @@
 #include <gui/modules/text_input.h>
 #include <gui/view_holder.h>
 #include <toolbox/name_generator.h>
+#include <momentum/settings.h>
 #include <toolbox/path.h>
 
 #include <lib/subghz/receiver.h>
@@ -664,7 +665,8 @@ static void nice_o_set_status(NiceOCode* app, const char* text) {
 static bool
     nice_o_save_key(NiceOCode* app, uint32_t serial, uint8_t btn, uint16_t cnt, const char* prefix) {
     char name[NICE_O_NAME_LEN];
-    name_generator_make_random_prefixed(name, sizeof(name), prefix);
+    name_generator_make_random_prefixed(
+        name, sizeof(name), prefix, momentum_settings.file_naming_prefix_after);
     if(!nice_o_ask_name(app, name, sizeof(name))) {
         nice_o_set_status(app, "Save cancelled");
         return false;
