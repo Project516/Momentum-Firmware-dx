@@ -53,7 +53,7 @@ void subghz_protocol_decoder_linear_delta3_feed(void* context, bool level, uint3
  * @param context Pointer to a SubGhzProtocolDecoderLinearDelta3 instance
  * @return hash Hash sum
  */
-uint32_t subghz_protocol_decoder_linear_delta3_get_hash_data(void* context);
+uint8_t subghz_protocol_decoder_linear_delta3_get_hash_data(void* context);
 
 /**
  * Deserialize data SubGhzProtocolDecoderLinearDelta3.

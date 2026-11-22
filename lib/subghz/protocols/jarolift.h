@@ -46,7 +46,7 @@ void subghz_protocol_decoder_jarolift_feed(void* context, bool level, uint32_t d
  * @param context Pointer to a SubGhzProtocolDecoderJarolift instance
  * @return hash Hash sum
  */
-uint32_t subghz_protocol_decoder_jarolift_get_hash_data(void* context);
+uint8_t subghz_protocol_decoder_jarolift_get_hash_data(void* context);
 
 /**
  * Deserialize data SubGhzProtocolDecoderJarolift.
