@@ -420,7 +420,12 @@ MomentumApp* momentum_app_alloc() {
     } else {
         // Make uppercase, add space, add build date
         furi_string_replace(app->version_tag, "mntm", "MNTM");
-        furi_string_cat_printf(app->version_tag, " %s", version_get_builddate(NULL));
+        if(furi_string_start_with(app->version_tag, "dx-")) {
+            // Tag already holds the date, pad in front
+            separator = 0;
+        } else {
+            furi_string_cat_printf(app->version_tag, " %s", version_get_builddate(NULL));
+        }
     }
     // Add spaces to align right
     while(canvas_string_width(canvas, furi_string_get_cstr(app->version_tag)) <=

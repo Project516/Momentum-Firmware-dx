@@ -1,0 +1,72 @@
+name: "Release"
+
+on:
+  push:
+    tags:
+      - "dx-*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+env:
+  FBT_GIT_SUBMODULE_SHALLOW: 1
+  GH_TOKEN: ${{ github.token }}
+  TAG: ${{ github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check tag name and branch"
+        run: |
+          set -e
+          if ! [[ "$TAG" =~ ^dx-[0-9]{4}\.[0-9]{2}\.[0-9]{2}(-[0-9]+)?$ ]]; then
+            echo "Tag $TAG does not match dx-YYYY.MM.DD or dx-YYYY.MM.DD-N"
+            exit 1
+          fi
+          status="$(gh api "repos/$GITHUB_REPOSITORY/compare/dev...$GITHUB_SHA" --jq .status)"
+          if [ "$status" != "identical" ] && [ "$status" != "behind" ]; then
+            echo "Tagged commit $GITHUB_SHA is not on dev (compare status: $status)"
+            exit 1
+          fi
+
+      - name: "Checkout code"
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: "Check version"
+        run: |
+          set -e
+          if [ "$(git describe --tags --abbrev=0 --exact-match)" != "$TAG" ]; then
+            echo "git describe does not resolve to $TAG, the device would show the wrong version"
+            exit 1
+          fi
+          echo "DIST_SUFFIX=$TAG" >> "$GITHUB_ENV"
+          echo "WORKFLOW_BRANCH_OR_TAG=$TAG" >> "$GITHUB_ENV"
+
+      - name: "Build the firmware and apps"
+        run: |
+          ./fbt TARGET_HW=7 DEBUG=0 COMPACT=1 copro_dist updater_package fap_dist
+
+      - name: "Check for uncommitted changes"
+        run: |
+          git diff --exit-code
+
+      - name: "Create the release"
+        run: |
+          set -e
+          previous="$(gh api "repos/$GITHUB_REPOSITORY/git/matching-refs/tags/dx-" --paginate \
+            --jq '.[].ref | ltrimstr("refs/tags/")' | sort -V | grep -x -B1 -F "$TAG" | head -n1)"
+          args=(--title "$TAG" --verify-tag --generate-notes)
+          if [ -n "$previous" ] && [ "$previous" != "$TAG" ]; then
+            args+=(--notes-start-tag "$previous")
+          fi
+          gh release create "$TAG" "${args[@]}" \
+            "dist/f7-"*"/flipper-z-f7-update-$TAG.tgz" \
+            "dist/f7-"*"/flipper-z-f7-full-$TAG.dfu" \
+            "dist/f7-"*"/flipper-z-f7-sdk-$TAG.zip"
