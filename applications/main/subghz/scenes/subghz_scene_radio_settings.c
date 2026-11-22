@@ -287,4 +287,3 @@ void subghz_scene_radio_settings_on_exit(void* context) {
     variable_item_list_reset(subghz->variable_item_list);
 }
 
-SUBGHZ_SCENE_PLUGIN_DEFINE(radio_settings)

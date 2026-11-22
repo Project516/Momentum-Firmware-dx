@@ -375,4 +375,3 @@ void subghz_scene_signal_settings_on_exit(void* context) {
     furi_string_free(byte_input_text);
 }
 
-SUBGHZ_SCENE_PLUGIN_DEFINE(signal_settings)
