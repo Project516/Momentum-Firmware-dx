@@ -18,7 +18,7 @@ releases them.
   `ofw`.
 - **mntm**: Momentum upstream, `Next-Flip/Momentum-Firmware`.
 - **momentum-dx**: this fork and its GitHub org. The website is
-  `momentum-dx/v2.momentum-fw.dev`, served at
+  `momentum-dx/website`, served at
   `https://momentum-dx.project516.dev`.
 - **Release tag**: `dx-YYYY.MM.DD` (`-2` for a second release the same day) on
   a commit on `dev`. The tag name is the firmware version on the device.
