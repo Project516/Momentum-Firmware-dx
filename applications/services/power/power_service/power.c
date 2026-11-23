@@ -419,9 +419,11 @@ static void power_auto_poweroff_timer_callback(void* context) {
     furi_assert(context);
     Power* power = context;
 
-    //Dont poweroff device if charger connected
-    if(power->state != PowerStateNotCharging) {
-        FURI_LOG_D(TAG, "We dont auto_power_off until battery is charging");
+    // A full battery on USB reports not charging, so also check for USB power.
+    // OTG drives VBUS itself, so it doesn't count.
+    const bool usb_powered = !power->info.is_otg_enabled && power->info.voltage_vbus > 4.0f;
+    if(power->state != PowerStateNotCharging || usb_powered) {
+        FURI_LOG_D(TAG, "No auto power off while charging or on USB power");
         power_start_auto_poweroff_timer(power);
     } else {
         power_off(power);
